@@ -102,3 +102,94 @@ that unnecessary requirements in them make tasks _harder_. The archive is worth
 having; keeping all of it in the always-on file is not. Traps and history belong
 in the journal, and `CLAUDE.md` should hold the minimum a session must not
 violate. This starter’s own is 194 lines and should stay closer to that than to 963.
+
+---
+
+## 2026-09-08 — 29 Navy bootstrapped from the template, and stopped one operator write short of a pushable `main` (plan F, Tasks 2–4)
+
+This repo's first entry. `reddoorla/29-navy` was created from
+`reddoorla/reddoor-starter` (native track, not blux — `src/lib/blux` is absent
+and `@slicemachine/adapter-sveltekit` is the adapter) and cloned to
+`~/Documents/GitHub/29-navy`. The site is 29 Navy, a Worthe creative-loft
+property in Venice; the reference is the single-page Webflow site at
+https://www.29navy.com/.
+
+The config edits are the `/new-site` set: `package.json#name` → `29-navy` (it
+drives the fleet audit's slug matching), `ci.yml`'s `netlify-site` →
+`"29-navy"`, `SITE_NAME` → `"29 Navy"`, the README placeholders filled. Left
+alone deliberately: `SITE_LOCALE` (`en_US`), `DEFAULT_OG_IMAGE` (`""` — there
+is no 1200×630 card yet and a Reddoor-branded default would leak), `<html
+lang="en">`, and the CSP. The reference loads no third-party web fonts — a
+system stack plus three Font Awesome faces, all self-hosted on the Webflow CDN —
+so the `devMatchImgHosts` dev-only CSP hole Beachfront carries has no
+counterpart here.
+
+Both gates were checked rather than assumed, because both default to measuring
+nothing while reporting green: `pkg.reddoor.a11yRoutes` already ships `["/"]`
+and `tests/smoke/routes.ts` already ships the single `/` entry keyed on the
+sentinel. For a one-page site both are already right, so nothing was changed —
+but "already correct" is a finding, not a skip.
+
+**The belief this session corrected.** The plan predicted that replacing the
+`your-prismic-repo-name` sentinel against an EMPTY Prismic repository would fail
+`pnpm build` with `404 /: Page not found` — the chain being Prismic's
+`NotFoundError` → `src/lib/page-load.ts:30-31`'s `error(404)` →
+`svelte.config.js`'s rethrow once `isPlaceholderRepo` is false. It does not. The
+real failure is:
+
+```
+[500] GET /
+Error: [function at(..)] unexpected field 'my.page.uid' on line:1 col:6 in query '[[at(my.page.uid, "home")]]'
+Error: 500 /: 500 /
+```
+
+An empty Prismic repository has no _custom types_, so the Content API rejects
+the **predicate itself** — `my.page.uid` names a field of a type that was never
+pushed — and returns a parsing error, not a not-found. `loadPage`'s catch tests
+`err instanceof NotFoundError`, which this is not, so it rethrows unmapped and
+SvelteKit prerenders a 500. `handleHttpError` then throws regardless of
+`isPlaceholderRepo`, because that guard only ever swallows a **404**.
+
+Three things follow. First, the plan's Step 6 expectation is wrong in shape
+though right in outcome — the build does fail, and harder than predicted.
+Second, the plan's differential diagnosis ("a `RepositoryNotFoundError` instead
+means the repository NAME is wrong") is missing a third outcome: an
+`unexpected field` parsing error means the repository name is _right_ and the
+`page` type has never been pushed. That is a genuinely useful signal and it is
+worth adding to the plan, because it distinguishes "wrong repo" from "empty
+repo" without a single extra query.
+
+Third, a correction to something drafted earlier in this same session and
+checked before it shipped. The first draft of this entry claimed the emergency
+hatch `VITE_PRISMIC_ENVIRONMENT=your-prismic-repo-name` would not rescue a build
+in this state either, on the reasoning that `handleHttpError`'s escape only
+swallows a 404 and this failure is a 500. Reading the code says otherwise: the
+hatch works, and it never reaches `handleHttpError` at all.
+`src/routes/[[preview=preview]]/+page.server.ts:19-21`'s `entries()` returns
+`[]` whenever `isPlaceholderRepo`, so `/` is not a prerender entry, no Prismic
+query is issued, and there is no error to handle. The two guards are doing
+different jobs: `entries()` is what actually protects the placeholder state, and
+`handleHttpError`'s `status === 404` clause is a second, narrower net for
+Prismic-backed routes that _are_ still crawled. Writing that down because the
+wrong version was one sentence away from being committed as fact, and because
+the project's own rule — a claim about what code does is a claim that must be
+made by reading that code — is exactly what caught it.
+
+**Where this stopped, and why nothing was pushed.** Task 3 Step 7 is an operator
+step: push the repo's own `page` custom type from `pnpm slicemachine`, then
+create and publish a stub `Page` document with uid `home`. Both are RED-tier
+Prismic writes. The Prismic MCP cannot substitute — it exposes no
+create-custom-type tool at all, and it is not activated for this repository
+anyway. Until that lands, `pnpm build` fails and so would CI.
+
+So the bootstrap is committed here but **not pushed**, and branch protection was
+not installed. That ordering is not fussiness: `self-updating` makes `ci / ci` a
+required context once it has been _observed_ on `main`, and
+`checkContextObserved` counts a check-run by name regardless of its conclusion.
+Pushing a knowingly red `main` would therefore arm a required check that cannot
+pass, and every later PR in this plan would need an operator `--admin` merge to
+escape it. The cheap thing to do now is wait for one Prismic write; the
+expensive thing is to push and then need admin merges for the rest of the build.
+
+Everything except `build` is green locally: `prettier --check .` clean, `eslint`
+clean, `svelte-check` 0 errors / 0 warnings across 4499 files.
