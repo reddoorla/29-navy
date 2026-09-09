@@ -308,6 +308,8 @@ is create-only).
 
 ## 2026-09-08 — What the master ref's `types` map does and does not prove (corrects the entry above)
 
+> Superseded in part by 2026-09-08 — The `types` check needs a host, and the class needs a name.
+
 The entry above cites `"types":{}` from `https://29-navy.cdn.prismic.io/api/v2` as
 its evidence that no document had been published. That evidence was wrong, and
 the correct version is more useful than the wrong one, so it is worth the space.
@@ -359,3 +361,60 @@ than a wrong push.
 **Gate state, unchanged:** zero published documents, `pnpm build` still exits
 non-zero on `[500] GET /`, release `aqCpxBEAAMYweC4y` still staged and awaiting one
 publish click.
+
+## 2026-09-08 — The `types` check needs a host, and the class needs a name (corrects the entry above)
+
+The entry above prescribes a diagnostic — "query `types` on the master ref" — and
+never says **which host**. That omission makes the instruction unsafe in one
+direction, and the reason is worth more than the fix.
+
+**Measured here, two calls to each host, seconds apart:**
+
+| Host                            | `cache-control`       | CloudFront                               |
+| ------------------------------- | --------------------- | ---------------------------------------- |
+| `29-navy.cdn.prismic.io/api/v2` | `max-age=0, no-store` | `Miss from cloudfront` → `Hit` on call 2 |
+| `29-navy.prismic.io/api/v2`     | `max-age=0, no-store` | no CloudFront headers at all             |
+
+The origin marks that response **uncacheable and the edge caches it anyway.** So
+the CDN host can serve a pre-push snapshot while its own headers promise it will
+not. That is the mechanism behind this repo's `"types":{}` reading two entries
+ago, and it is not "the CDN might lag" — it is a response that says `no-store`
+coming back as a cache hit.
+
+**The asymmetry, which is the actual rule.** A `types` map can lag reality but can
+never lead it, so:
+
+- **Presence is trustworthy.** `page` in `types` means the type is registered.
+  A stale snapshot could not have invented it.
+- **Absence proves nothing.** It is equally consistent with "never pushed" and
+  "pushed, and you are holding a cached older copy".
+
+Confirm any absence against the bare host `<repo>.prismic.io/api/v2`, or against
+`customtypes.prismic.io`. The corrected check is in maintenance PR #709
+(`49e8561`).
+
+**Naming the class, because three instances landed in one day.** Every one of
+these was the same shape — _a derived or cached view of state, read as though it
+were the state_:
+
+1. Plan F's "`unexpected field` means the type was never pushed" (#707).
+2. This journal's `"types":{}` as evidence about published content.
+3. #709's first replacement, which asserted the `types` map in **both**
+   directions.
+
+And two more from the same day that are the same rule wearing different clothes:
+`netlify env:set --site` exiting 0 having written nothing (issue #710), and the
+one-sentence claim in this session that the publish gate had CLEARED because
+`page` appeared in `types`.
+
+Five instances, one rule, already written down: **a pass needs the artefact only a
+working system produces.** `types` is a registry. An exit code is a return value.
+The gate has always been a prerendered `build/index.html`, and it still has not
+been produced. Fixing these one at a time is what CLAUDE.md's "enumerate the
+defect class before fixing an instance" exists to prevent, and today is a fair
+demonstration that the rule is easier to state than to apply — three of the five
+were committed by people actively holding the rule in mind, including while
+writing the correction to a previous instance of it.
+
+**Gate state, unchanged:** zero published documents, release `aqCpxBEAAMYweC4y`
+staged, `pnpm build` non-zero on `[500] GET /`.
