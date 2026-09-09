@@ -418,3 +418,16 @@ writing the correction to a previous instance of it.
 
 **Gate state, unchanged:** zero published documents, release `aqCpxBEAAMYweC4y`
 staged, `pnpm build` non-zero on `[500] GET /`.
+
+**Filed, so the enumeration outlives the session.** The class is
+[reddoor-maintenance#711](https://github.com/reddoorla/reddoor-maintenance/issues/711).
+Instance 4, the `netlify env:set --site` false green, is
+[#710](https://github.com/reddoorla/reddoor-maintenance/issues/710). And the code
+review of this session's own `resolveOwnerRepo` extraction produced
+[#712](https://github.com/reddoorla/reddoor-maintenance/issues/712) — the shared
+helper derives a GitHub **write** identity from a git remote without validating
+provenance, so a GitLab origin resolves to a GitHub target, and a path inside a
+checkout resolves to the enclosing repository. That is the same class one layer
+down: a derived value treated as a validated one. It is inherited rather than new,
+but it becomes load-bearing the moment `prismic-ci` writes a token at that
+identity, which is the very next task.
