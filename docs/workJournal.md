@@ -488,3 +488,60 @@ does not re-open them:
 `reddoor-maintenance` branch the session spent most of its time on — the working
 directory decided that, not a choice. The maintenance branch gets its own review
 before its PR.
+
+## 2026-09-08 (overnight) — The publish landed and the whole bootstrap chain ran through to a live deploy
+
+The operator published release `aqCpxBEAAMYweC4y` and everything downstream of it
+ran unattended. Recording the evidence rather than the sequence, because the
+sequence is in the plan and the evidence is what was missing all night.
+
+**The gate, with the artefact this time.** `search_documents` with
+`statuses: ["published"]` returns `total: 1` — document `aqCp8REAADEAeC8A`, uid
+`home`, `releaseId: null`, i.e. on the master ref. `pnpm build` exits 0 and
+produces `build/index.html`, 5315 bytes, `<title>29 Navy</title>`. That file is
+the thing three earlier entries kept saying was the real gate, and it exists.
+
+**`pnpm verify` exit 0**: prettier, eslint, svelte-check, build, axe (0 violations
+across 2 routes) and 334 unit tests, then 4 Playwright specs including
+`/ (home) loads with no console errors`. That last one is the smoke case that
+flips from expecting 404 to expecting 200 once the sentinel is gone and a
+document is published — it had never run in its 200 form before tonight.
+
+**Pushed `3b6ab20..349613c`**, six commits. CI conclusion read explicitly rather
+than inferred: `success`.
+
+**Branch protection armed after the green, not before.** `self-updating` created
+the ruleset `main: reviewed changes only` and made `ci / ci` a required context.
+That ordering was the whole reason the bootstrap sat unpushed for a day: the
+recipe requires a context only once it has been OBSERVED, and observation counts
+a check-run by name regardless of conclusion, so pushing a knowingly red `main`
+would have armed a check that could not pass. It cost a day of waiting and saved
+every subsequent PR an admin merge.
+
+**Netlify deployed from the push with no intervention** — state `ready`, branch
+`main`, commit `349613c` — and `https://29-navy.netlify.app/` answers 200. That
+is the first proof the repo link actually works. It was configured through
+`netlify api updateSite` rather than the dashboard OAuth flow, so until a real
+deploy ran, "linked" was a config reading and nothing more.
+
+**The fleet row already existed, and was better than the one this session would
+have written.** `ensure-site` reported `exists (recADTWf6LCobVob0) — differs from
+existing, left untouched: url`, and refusing was correct. The row holds
+`Name: 29 Navy`, `Status: building`, and `url: https://www.29navy.com/` — the
+client's live Webflow site, not `29-navy.netlify.app`. `building` is why
+`--fleet airtable` filters this site out of fleet runs, which is right for
+pre-launch.
+
+But that `url` is worth a decision before launch, because two consumers read it
+differently. Reports and audits want the site we are responsible for; `launch`'s
+new `dev-guard` probes `<url>/dev/match/home` and `<url>/health` on the DEPLOYED
+build. Pointed at the Webflow origin, `/health` 404s, the liveness control fails,
+and `launch` refuses — fail-closed, so nothing unsafe, but it refuses for a
+reason that has nothing to do with the twin it is checking. Left as the
+operator's call. No point-of-contact field is set on the row either; `--contact`
+was omitted deliberately rather than guessed, and unlike `--name` it is
+re-runnable.
+
+**One thing this changes for every later session:** `main` is protected now.
+Direct pushes are refused; this entry arrived by pull request, which is also the
+first exercise of that path.
