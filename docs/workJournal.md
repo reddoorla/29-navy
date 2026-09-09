@@ -196,6 +196,8 @@ clean, `svelte-check` 0 errors / 0 warnings across 4499 files.
 
 ## 2026-09-08 — The operator write landed by halves, and the rest of the site's wiring went in around it (plan F, Tasks 3 Step 7 / 4 / 5, unpushed)
 
+> Superseded in part by 2026-09-08 — What the master ref's `types` map does and does not prove.
+
 The previous entry stopped at Task 3 Step 7 waiting on two Prismic writes. One of
 the two arrived. This entry records which, how the halves were told apart, and
 the identifiers for everything created since — the release in particular, because
@@ -303,3 +305,57 @@ Everything that does not depend on the publish is now done. One click unblocks:
 publish → `pnpm build` goes green → push `main` → `self-updating` for protection
 → `ensure-site` for the fleet row (needs the client contact email, and `--name`
 is create-only).
+
+## 2026-09-08 — What the master ref's `types` map does and does not prove (corrects the entry above)
+
+The entry above cites `"types":{}` from `https://29-navy.cdn.prismic.io/api/v2` as
+its evidence that no document had been published. That evidence was wrong, and
+the correct version is more useful than the wrong one, so it is worth the space.
+
+**The stale read.** That probe was issued within a minute or two of the operator's
+type push, against a CDN-cached endpoint. It returned the pre-push body. Nothing
+was inferred incorrectly from it that changed a decision, but "the Content API
+says there are no types" was never measured — a cache was.
+
+**What is actually true, measured directly.** On master ref `aqBkdBEAADEAd1gR`:
+
+- `types` = `form_replies, page`. The type is registered and the Content API can
+  see it.
+- The exact query the build issues — `GET /api/v2/documents/search?ref=…&q=[[at(my.page.uid,"home")]]`
+  — returns **HTTP 400**, `{"type":"api_parsing_error","message":"[function at(..)] unexpected field 'my.page.uid'"}`.
+- `search_documents` for type `page`, `statuses: ["published"]` returns `total: 0`,
+  `exhaustive: true`.
+
+So the type is listed **and** the predicate naming its field is still rejected.
+Those two facts together are the finding: **a type's presence in `types` and its
+fields' addressability in a predicate are different things.** A type joins `types`
+the moment it is pushed; its fields become predicate-addressable only once a
+document of that type is **published**, because the query parser validates field
+names against the schema indexed from published content.
+
+**This settles plan F's "third outcome", against plan F.** That text says an
+`unexpected field 'my.page.uid'` error means "the repository name is RIGHT and the
+`page` custom type has never been pushed to it". It does not. Today the type _had_
+been pushed — it is in `types`, and its model matches the repo's own
+`customtypes/page/index.json` — and the build error was byte-identical to the
+error produced when no type existed at all. The two states are indistinguishable
+from the build output. The entry above reached the right conclusion by the wrong
+route; this one reaches it by measurement.
+
+**The diagnostic that actually works**, for whoever hits this next: do not read
+the build error. Query `types` on the master ref, or `list_custom_types` on the
+Custom Types API. If `page` is absent, the type was never pushed. If `page` is
+present and the build still says `unexpected field`, the missing thing is a
+**published document**, and re-pushing the type will do nothing.
+
+**A false green of my own, for the record.** Seeing `page` appear in `types` was
+briefly reported as the publish gate having cleared. It had not. The `types` map
+was never the gate; a prerendered `build/index.html` is. This is the same rule the
+entry above cites Netlify for breaking — a pass needs the artefact only a working
+system produces, and `types` is configuration, not content. Checked against the
+build within the minute, which is the only reason it was a wrong sentence rather
+than a wrong push.
+
+**Gate state, unchanged:** zero published documents, `pnpm build` still exits
+non-zero on `[500] GET /`, release `aqCpxBEAAMYweC4y` still staged and awaiting one
+publish click.
