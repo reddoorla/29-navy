@@ -8,9 +8,11 @@
   ],
   "threshold": 0.1,
   "maxHeightDelta": 0.05,
-  "refMark": "",
+  "refMark": "data-wf-site=\"61411d5add9b561004cfbf8b\"",
   "candMark": "_app/immutable",
-  "selfHosts": [],
+  "selfHosts": [
+    "29-navy.netlify.app"
+  ],
   "pages": {
     "home": {
       "uid": "home",
