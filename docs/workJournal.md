@@ -193,3 +193,113 @@ expensive thing is to push and then need admin merges for the rest of the build.
 
 Everything except `build` is green locally: `prettier --check .` clean, `eslint`
 clean, `svelte-check` 0 errors / 0 warnings across 4499 files.
+
+## 2026-09-08 — The operator write landed by halves, and the rest of the site's wiring went in around it (plan F, Tasks 3 Step 7 / 4 / 5, unpushed)
+
+The previous entry stopped at Task 3 Step 7 waiting on two Prismic writes. One of
+the two arrived. This entry records which, how the halves were told apart, and
+the identifiers for everything created since — the release in particular, because
+a staged release nobody can name later is a thing that costs a whole session to
+rediscover.
+
+**The type landed; the document did not.** `pnpm build` still failed, and still
+with the _same_ error the previous entry measured — `[function at(..)] unexpected
+field 'my.page.uid'`. That was initially read as "nothing happened", which was
+wrong. Three observations separate the halves, and only together:
+
+- Prismic's Custom Types API (through the MCP, which was activated for this
+  repository at the same time) lists **two** types: `page` and `form_replies`.
+  The `page` model is byte-for-byte the repo's own `customtypes/page/index.json`
+  — all nine slice choices registered — so the operator pushed the repo's model
+  rather than hand-drawing one, which is what Step 7 asked for.
+- `search_documents` for custom type `page` returned `total: 0`, `exhaustive:
+true`, across every status. Not a draft, not a release, nothing.
+- The Content API at `https://29-navy.cdn.prismic.io/api/v2` reported
+  `"types":{}` on the master ref.
+
+That last one is the reconciliation, and it corrects an inference the previous
+entry invited. The `unexpected field 'my.page.uid'` error does **not** mean "the
+type has never been pushed", as Task 3 Step 6's corrected text now says. It means
+_the master ref has no published document of that type_. The Content API builds
+its queryable field set from published content, so a custom type that exists in
+the Custom Types API but has never had a document published is invisible to the
+predicate parser in exactly the same way a wholly absent type is. The two states
+are indistinguishable from the build error alone. Anyone diagnosing this again
+should query `list_custom_types` before concluding anything from the build.
+
+**The stub document is staged, not published.** Created through the Prismic MCP
+rather than by hand, so the UID could not be typo'd — it is the one load-bearing
+field, and `home` is what `src/routes/[[preview=preview]]/+page.server.ts` asks
+for:
+
+| Thing                | Id                                                |
+| -------------------- | ------------------------------------------------- |
+| Document             | `aqCp8REAADEAeC8A`                                |
+| Version              | `aqCp8REAADEAeC8B`                                |
+| Release              | `aqCpxBEAAMYweC4y` ("Stub home page (bootstrap)") |
+| uid / title / locale | `home` / `29 Navy` / `en-us`                      |
+
+**A staged release does not satisfy the gate, and it is worth being explicit
+about why**, because "the document exists" reads like the blocker is gone. It is
+not. A release-staged document is not on the master ref, so the Content API still
+reports no published document behind `page`, the predicate still fails, `pnpm
+build` still exits non-zero, and pushing `main` would still arm an unpassable
+required check. Nothing about the push gate moved. The remaining action is one
+publish click in the Prismic dashboard, and the MCP deliberately declines to
+publish a release on its own.
+
+**Netlify, done in full.** Site `29-navy`, id
+`0627e670-a816-48b2-bd32-b2e52c8d2103`, at `https://29-navy.netlify.app` — the
+URL `.github/workflows/ci.yml:14` already names. Created blank with
+`--disable-linking`, then linked to `reddoorla/29-navy` (branch `main`, cmd `pnpm
+run build`, dir `build/`) through `netlify api updateSite` rather than the
+dashboard's OAuth flow, using `installation_id` 138273809 copied from three
+existing fleet sites. That the App can actually _read_ a repository created hours
+earlier is not assumed: `gh api orgs/reddoorla/installations` reports
+`138273809 netlify selection=all`, so the installation covers every repo in the
+org including this one. `FORMS_INGEST_URL` and `FORMS_INGEST_TOKEN` are set;
+`PUBLIC_TURNSTILE_SITE_KEY` is deliberately absent, since the reference has no
+forms.
+
+**A false green, caught only because it was checked.** `netlify env:set KEY VALUE
+--site <id>` run from outside a linked directory **exits 0 and writes nothing**.
+Both variables were reported set on that basis and neither existed. What exposed
+it was reading them back — `netlify env:list` returned a single variable,
+`NODE_VERSION`, which is not even a site variable but `netlify.toml`'s
+`build.environment` being merged into the listing. The fix was `netlify link
+--id` first, then `env:set` with no `--site` flag, then a read-back that shows all
+three. This is precisely the defect class CLAUDE.md's first rule names: an exit
+code is the absence of an error, and it was allowed to mean success. Worth
+remembering that `--site` is accepted-and-ignored by `env:set`, because the CLI
+gives no hint of it.
+
+**Secrets.** `PRISMIC_WRITE_TOKEN` on `reddoorla/29-navy` and
+`PRISMIC_TOKEN_29_NAVY` on `reddoorla/reddoor-maintenance`, both set from the
+288-character value the operator had put in the local `.env` (which is
+`.gitignore:7`, confirmed before anything ran). The token's _length_ is
+consistent with a Custom Types API JWT but its _type_ is unverified — nothing
+here has spent it. The first `prismic-ci` run is what will prove it, and if that
+run fails on authorization, this is the line to come back to.
+
+Unrelated caution for whoever reads the CLI output next: `netlify env:set` echoes
+the value it just set into stdout. The shared `FORMS_INGEST_TOKEN` was therefore
+printed in cleartext in a session transcript. No action taken; flagged so a
+rotation decision is at least an informed one.
+
+**A wrong call, recorded because the method was the wrong part.** The branch
+`origin/docs/plan-f-corrections-and-journal` in the maintenance repo was reported
+here as unmerged work needing a PR. It is merged — PR #707, squash-merged at
+2026-09-08T23:21:05Z. Two habits produced the error together: `gh pr list --state
+open`, which hides a merged PR entirely, and `git diff origin/main...branch`,
+whose three-dot form diffs from the merge base and so shows a squash-merged
+branch's changes as though they were still outstanding. The two-dot form,
+`git diff origin/main origin/<branch> -- <paths>`, compares the trees as they
+stand and returns empty. Use the two-dot form and `--state all`; a squash merge
+makes a landed branch look exactly like abandoned work.
+
+**Where this stands.** `main` is still local-only at `be723c5`, still deliberately
+unpushed, remote still at `3b6ab20`, for the reason the previous entry gives.
+Everything that does not depend on the publish is now done. One click unblocks:
+publish → `pnpm build` goes green → push `main` → `self-updating` for protection
+→ `ensure-site` for the fleet row (needs the client contact email, and `--name`
+is create-only).
