@@ -107,6 +107,8 @@ violate. This starter’s own is 194 lines and should stay closer to that than t
 
 ## 2026-09-08 — 29 Navy bootstrapped from the template, and stopped one operator write short of a pushable `main` (plan F, Tasks 2–4)
 
+> Superseded in part by 2026-09-08 — What the master ref's `types` map does and does not prove.
+
 This repo's first entry. `reddoorla/29-navy` was created from
 `reddoorla/reddoor-starter` (native track, not blux — `src/lib/blux` is absent
 and `@slicemachine/adapter-sveltekit` is the adapter) and cloned to
@@ -431,3 +433,58 @@ checkout resolves to the enclosing repository. That is the same class one layer
 down: a derived value treated as a validated one. It is inherited rather than new,
 but it becomes load-bearing the moment `prismic-ci` writes a token at that
 identity, which is the very next task.
+
+## 2026-09-08 — What an adversarial review of this branch found, including a hatch that greens the whole gate over an empty site
+
+A `/code-review high` over `origin/main...HEAD` at the end of the session. Six
+findings; the two that matter are recorded here because both are false greens,
+and one of them is armed and waiting in the starter itself.
+
+**The emergency hatch produces a green build with no home page.** Two entries
+above, `VITE_PRISMIC_ENVIRONMENT=your-prismic-repo-name pnpm build` is described
+as an escape that "works". It does — for a narrow definition. Measured here:
+
+```
+build exit=0
+build/index.html: ABSENT
+files in build/: 5
+```
+
+`entries()` returns `[]` when the sentinel is in force, so `/` is never a
+prerender entry and no home page is emitted. `pnpm build` is nonetheless green,
+and `tests/smoke/routes.ts:34-35` reads the **same** environment variable, so the
+smoke suite flips its expectation for `/` from 200 to 404 and passes as well. The
+starter mitigates partially — the flipped case renames the test so the title says
+so — but a title is read by a human and an exit code is read by CI.
+
+The consequence is the shape worth naming: **setting that variable in CI or on
+Netlify, to make a red build go green, greens the entire gate over a site that
+serves no home page.** It is the fastest available fix for the exact failure this
+repo is sitting in right now, which is precisely when someone would reach for it.
+It is not a hatch to a working site; it is a hatch to a working _build_. Filed
+against the starter, since the mechanism ships to every clone.
+
+**`static/favicon.png` is still the stock Svelte logo**, 1571 bytes, wired as both
+`icon` and `apple-touch-icon` at `src/app.html:5-6`. `docs/NEW-SITE.md` lists it
+under Identity and the bootstrap entry's enumeration missed it. Small, but it is
+a launch-visible default and the class of thing that survives to production
+because nobody owns it.
+
+**Two findings that look like defects and are not**, recorded so the next reader
+does not re-open them:
+
+- `PRISMIC_WRITE_TOKEN` on `reddoorla/29-navy` has no consumer today — `ci.yml`
+  passes no `secrets:` and there is no other workflow. That is correct rather
+  than wrong: the consumer is the `prismic-models.yml` workflow that
+  `reddoor-maint prismic-ci` installs, which is plan F Task 7 and has not run.
+  The secret is pre-provisioned, not orphaned.
+- The review notes the cleartext `FORMS_INGEST_TOKEN` was journalled without an
+  issue while smaller findings got one. Deliberate, and worth stating: filing a
+  public issue describing a live shared credential's exposure advertises it. The
+  right channel is the operator, who has been told directly, and the decision to
+  rotate is theirs. An issue would make the record worse, not better.
+
+**On the review's scope, honestly.** It reviewed this repo, not the
+`reddoor-maintenance` branch the session spent most of its time on — the working
+directory decided that, not a choice. The maintenance branch gets its own review
+before its PR.
