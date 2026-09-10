@@ -100,7 +100,14 @@
            for pointer/keyboard-tab users. Keyed by index: nav labels/hrefs aren't
            unique (two "" heading hrefs or repeated labels would collide and Svelte
            throws each_key_duplicate at hydration). -->
-      <ul class="nav-menu-ref hidden items-center lg:flex">
+      <!-- md (768px), not lg (1024px). The reference collapses its bar to the
+           hamburger inside `@media screen and (max-width: 767px)` — that block
+           is where `.menu-button` (ref css:3345) and `.nav-menu` (ref css:3353)
+           get their mobile rules — so the inline links survive down to 768 and
+           the burger appears at 767. Measured at 991 before this: the reference
+           kept all six links and wrapped to h=124, while this bar had already
+           swapped to the burger at h=80. -->
+      <ul class="nav-menu-ref hidden flex-wrap items-center justify-center md:flex">
         {#each items as item, i (i)}
           {#if item.children && item.children.length > 0}
             <li class="group relative">
@@ -156,7 +163,7 @@
         <button
           bind:this={openButtonEl}
           type="button"
-          class="flex min-h-11 min-w-11 items-center justify-center lg:hidden"
+          class="nav-burger flex min-h-11 min-w-11 items-center justify-center md:hidden"
           onclick={openMenu}
           aria-label="Open menu"
         >
@@ -280,12 +287,17 @@
     height: auto;
   }
 
-  /* ref css:2164-2168 — .container.w-container */
+  /* ref css:2164-2167 — .container.w-container.
+     `display: flex` (ref css:2168) is deliberately NOT set here: this element's
+     display is owned by the `hidden md:flex` utilities that collapse the bar at
+     the reference's own 767 boundary. Setting it in this block won the cascade
+     against `hidden`, so at 390 the six links stayed on screen and stacked —
+     measured, a 384px bar against the reference's 60px. Two owners for one
+     property is the bug; the utility keeps it, and `md:flex` IS ref css:2168. */
   .nav-menu-ref {
     justify-content: center; /* ref css:2165 */
     margin-left: auto; /* ref css:2166 */
     margin-right: auto; /* ref css:2167 */
-    display: flex; /* ref css:2168 */
   }
 
   /* .w-nav-link — Webflow's own base for every link in the bar, ref css:1823-1832.
@@ -319,6 +331,21 @@
     transition:
       color 0.2s,
       background-color 0.2s; /* ref css:2146 */
+  }
+
+  /* .w-nav-button — ref css:1895-1905. This is where the mobile bar's 60px
+     comes from: a 24px glyph inside 18px of padding on every side. Measured
+     before it landed, the burger was Tailwind's 44px touch target and the bar
+     was 44 against the reference's 60, at both 767 and 390.
+     `display` is NOT transcribed here (ref css:1904 says `none`) — it belongs
+     to `md:hidden`, for the same reason .nav-menu-ref does not set it. 60px
+     also clears the 44px minimum touch target, so the a11y floor still holds. */
+  .nav-burger {
+    cursor: pointer; /* ref css:1897 */
+    padding: 18px; /* ref css:1902 */
+    font-size: 24px; /* ref css:1903 */
+    position: relative; /* ref css:1905 */
+    color: #fff; /* ref css:3346 — .menu-button, var(--white) */
   }
 
   /* ref css:2149-2152 */
