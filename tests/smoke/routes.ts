@@ -10,8 +10,14 @@
 // the repository name — mirroring `isPlaceholderRepo` in src/lib/prismicio.ts
 // and the entries() prerender guard in the home route. The moment a fork wires
 // a real Prismic repo in slicemachine.config.json, the same entry expects 200
-// with zero edits. The hydration marker `footer` is the shared layout footer,
-// present on every page including the error page.
+// with zero edits.
+//
+// The hydration marker is `nav`, not the starter's `footer`. 29 Navy HAS NO
+// FOOTER: the reference document ends at #contact.section-7 and has no <footer>
+// anywhere, so src/routes/+layout.svelte does not render one (the reasoning is
+// there, at the point of removal). `nav` serves the identical purpose — it is
+// rendered by the same layout, above <main>, so it is present on every page
+// including the error page — and it still fails if the layout never paints.
 
 // Playwright runs this file as native ESM in Node, where JSON imports require
 // the explicit attribute (unlike Vite-bundled src/lib/prismicio.ts).
@@ -42,8 +48,8 @@ export const smokeRoutes: SmokeRoute[] = [
       {
         path: "/",
         name: "home — placeholder repo, expecting 404",
-        hydrationMarker: "footer",
+        hydrationMarker: "nav",
         expectStatus: 404,
       }
-    : { path: "/", name: "home", hydrationMarker: "footer" },
+    : { path: "/", name: "home", hydrationMarker: "nav" },
 ];
