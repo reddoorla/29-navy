@@ -993,3 +993,79 @@ now capable of holding this page, and holds an empty `home` document. Three
 issues open: reddoorla/claude-skills#2 (harness animation freeze, behind the
 Creative Lofts floor), reddoorla/reddoor-maintenance#763 (the recipe naming a
 seed command that does not exist), and #13 (this).
+
+## 2026-09-10 — Alt text gets a channel, and the seed gets written (#13)
+
+Two asks, one dependency between them: the seed's input contract is `img`, so
+widening `img` had to come first or the alt text would have had to be typed into
+the CMS by hand afterwards.
+
+**`img(url)` → `img(url, alt)`.** Backward-compatible by construction, which is
+what made it safe to do without touching a recipe-owned file. Settled from the
+recipe's own table rather than by guessing: `MATCH_HARNESS_FILES` marks
+`src/lib/site-pages.js` as `owner: "site"`, and `planFileWrite` returns `skip`
+for those — "records are never touched again". The dev route and
+`site-pages.test.ts` are `owner: "recipe"` and stay untouched; because JS drops
+extra arguments, the recipe's one-argument `devImg` keeps working unchanged and
+the dev surface renders exactly what it did before.
+
+**One alt per URL, because Prismic says so.** Alt lives on the ASSET, not the
+field: `@prismicio/client`'s `Migration.js` does `config.alt = config.alt || …`,
+so a second `createAsset` for the same file cannot re-alt it — it keeps the
+first and drops the rest in silence. The aerial is used twice, in the hero's
+mobile band and the location band, and mocks.json had two authored strings for
+it ("the surrounding blocks" vs "the surrounding Santa Monica blocks"). The more
+specific one won. `site-pages-images.test.ts` now fails on a URL with two alt
+strings rather than letting Prismic pick, and the resolver throws on it too.
+
+**Two of my own assertions were wrong, and the test caught them.** I wrote an
+alt-length floor of 10 characters; it failed six images whose alt is exactly
+right — "Lyft", "Uber", "ClassPass", "29 Navy". A brand logo's alt _is_ the
+brand name, and a rule that calls that too short teaches people to pad it.
+Removed; the invariant is non-empty and nothing more. Then the file-existence
+check failed three URLs — the floor-plan triggers, referenced percent-encoded
+(`Untitled%20design%20(16).png`) and sitting on disk with literal spaces,
+because that is how the reference serves them and how the capture saved them.
+All three return 200 in production: a browser decodes before reaching the
+filesystem. `readFileSync` does not. So the seed needed `decodeURIComponent`,
+and would otherwise have died on exactly those three **after** uploading the
+other 21 assets. Those are the same three files Phase 0's `url()` extractor
+missed — the third time that one parenthesis has cost something.
+
+**The seed: `scripts/import/seed-home.mjs`.** Dry run by default; `--apply`
+writes. Measured dry run: `UPDATE aqCp8REAADEAeC8A page/home`, slices 0 → 5,
+**24 assets, 4.7MB** — 24 and not 25 because of the dedup.
+
+Three decisions worth the space:
+
+- **`.mjs`, not `.ts`.** `scripts/import/migrate.example.ts` says to run it with
+  `pnpm tsx` and imports `dotenv/config`; neither is a dependency of this repo
+  and neither ever has been, so those instructions have never worked. Node's
+  `--env-file` replaces dotenv and Node 20+ has `File` and `fetch`, so this runs
+  on the node the repo already requires and adds no dependency.
+- **Importing the file does nothing.** `main()` is behind an `argv[1]` check and
+  a test spawns node to import the module and asserts the output is empty. This
+  is not hypothetical: earlier in this project I imported a sibling script
+  purely to syntax-check it and executed it against the live reference. The same
+  mistake here is a CMS write.
+- **UPDATE, never CREATE, when the uid exists.** The write client decides on
+  `document.id` alone (`WriteClient.js:163` — no id means create), so the lookup
+  is what makes a re-run idempotent. Without it a second run leaves two `home`
+  documents and the route serves whichever Prismic answers with. Fields the
+  assembly does not mention survive: the seed writes slices, it does not blank
+  the SEO tab.
+
+`vite.config.ts` now includes `scripts/**/*.test.{js,ts}`. "It is only a script"
+is exactly the reasoning that leaves the irreversible code as the untested code.
+
+Every guard was broken on purpose and watched go red: the import guard removed
+(the inertness test failed), dedup disabled (two tests), `decodeURIComponent`
+removed (the path test). `pnpm verify`: **55 files, 468 tests, 4 smoke, exit 0.**
+
+**What is NOT done.** The seed has not been run. `--apply` uploads 24 assets to
+the media library, and deleting those again is manual — the document update is
+versioned and revertible in the editor, the assets are not. That asymmetry is
+printed in the dry-run footer so it is in front of whoever types the command.
+After a successful run the `AWAITING_SEED` allowlist in `svelte.config.js` comes
+out. `meta_title` and `meta_description` on the home document are still null;
+the seed deliberately does not invent them.
