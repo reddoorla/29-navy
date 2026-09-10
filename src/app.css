@@ -210,9 +210,17 @@ main > section.hero-band:first-child {
 }
 
 @layer base {
+  /* NO `scrollbar-gutter: stable`. The starter sets it to stop layout shifting
+     when a scrollbar appears; the reference does not have it, and its only html
+     rule is `height: 100%` (ref css:218-220). Keeping it costs 15px of every
+     viewport: measured at 1440, `document.body` laid out at 1425 against the
+     reference's 1440, so every full-bleed element on the page — the six 100vh
+     slides above all — was scaled and shifted by 1.04%. That read as ~47% pixel
+     mismatch on the hero at ALL FOUR viewports, which looks like a hero bug and
+     is not one. `clientWidth` is 1440 on both pages, so the difference is
+     invisible to any check that measures the viewport rather than the body. */
   html {
     scroll-behavior: smooth;
-    scrollbar-gutter: stable;
   }
 
   /* The root type ladder, transcribed from the reference — css:222-230.
