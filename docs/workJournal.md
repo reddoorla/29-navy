@@ -649,6 +649,9 @@ seen to refuse is not evidence that it can.
 
 ## 2026-09-10 — The installed harness was the one that could lie, upgraded in place (`maint/match-harness-20260910T172826020Z`)
 
+> Superseded in part by 2026-09-10 (later) — The upgraded gate refused for the
+> right reason, and named exactly what Phase 2 has to build.
+
 This site installed its harness from `@reddoorla/maintenance@0.95.0` and then
 stayed there while four defects were found in that exact code — by _using_ it
 here, not by reviewing it. Fixing them upstream reached nobody: a recipe-owned
@@ -696,3 +699,54 @@ status under zsh, not the script's — read as exit 0 when the real answer is 2.
 was inert on this re-run — the four anchors, the `[1440, 991, 767, 390]` matrix
 and `TOTALS.home = 20` are unchanged and still this site's own. Nothing has
 re-run the gate yet, so the site has no countable run and no score.
+
+## 2026-09-10 (later) — The upgraded gate refused for the right reason, and named exactly what Phase 2 has to build
+
+> Adds the measurement the entry above said had not been taken.
+
+The harness upgrade was merged (`2dc4489`) proving only that the new scripts
+REFUSE. A guard proven only to refuse is not proven — the repo's own rule 1 says
+an error matcher may never do more than deny, so a green has to come from
+somewhere. This is that run.
+
+**Both directions, against the live reference.** `bash matching/gate.sh smoke3
+home` printed:
+
+```
+REF OK — https://www.29navy.com/ → 200, no redirect, refMark present, candMark absent
+########## home ##########
+home exit=2
+  NOT MEASURED: NO RUN — matching/out-smoke3-home/report.json: no report.json — the run wrote nothing
+
+GATE INCOMPLETE (smoke3) — 1 of 1 page(s) produced no
+countable report: home
+```
+
+The `REF OK` line is the GRANT: `checkRef` is fail-closed on four separate
+conditions and cleared all four against the real Webflow reference, so it is not
+a guard that refuses everything. `GATE INCOMPLETE` with exit 2 is the REFUSAL —
+and it is precisely the sentence the old gate could not produce. The `0.95.0`
+render printed `ALL DONE (smoke3)` here, unconditionally, over a page that wrote
+no report at all (#744). Same site, same command, opposite answer.
+
+`node matching/next.mjs` then exits 2 with _"no parseable gate run"_ — the gate
+and the scorer agreeing on what counts, which is the drift #751's shared
+`uncountable()` predicate exists to prevent, observed rather than asserted.
+
+**Why the candidate wrote nothing, exactly.** `GET
+http://localhost:5173/dev/match/home` returns **404**, and the route names its
+own cause: `no assembly for "home" (have: none)`. `documents()` in
+`src/lib/site-pages.js` returns **zero** assemblies. So the 404 is not the
+dev-guard, not a routing bug and not the harness — the site genuinely has no
+page to render. `src/lib/site-pages.js` is site-owned, so the recipe skipped it
+on the upgrade, correctly: it is ours to author.
+
+That locates the boundary precisely. Everything the harness needs is installed
+and behaves correctly in both directions; the first countable run needs the
+first home assembly, and writing it is Phase 2. The next session does not need
+to re-derive any of this — start at `documents()` in `src/lib/site-pages.js`,
+and the gate will have something to measure.
+
+**Nothing was left running.** The `pnpm dev` on 5173 was stopped and the port
+released; `matching/out-smoke3-*` is covered by the harness block's negated
+whitelist in `.gitignore`, so the tree is clean.
