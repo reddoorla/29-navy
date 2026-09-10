@@ -61,6 +61,17 @@ esac
 shift || true
 WANT=("$@")
 
+# What this round actually measured. These are read by the terminal block far
+# below, and the page loop is `done < <(...)` — process substitution, NOT a
+# pipe — precisely so they survive it (gate.sh's own note at the loop, and
+# census.sh:193-198, record the same trap). Converting that loop to a pipe
+# would leave every counter here reading 0, which is the green this file now
+# exists to stop.
+MEASURED=0
+ATTEMPTED=0
+UNMEASURED=""
+SEEN=""
+
 # Fail closed on the reference before spending a single run. A 200 is NOT
 # evidence: a production host that has cut over to OUR build answers 200, and
 # every region then scores near zero against itself. --check-ref requires an
@@ -91,6 +102,9 @@ has_spec() { # page
 
 run() { # tag refpath candpath sections
   local page="$1" refpath="$2" candpath="$3" sections="$4"
+  # BEFORE the WANT filter, so the known-page list stays complete even when
+  # WANT matches nothing and there is a typo to name. Mirrors census.sh:107.
+  SEEN="$SEEN $page"
   if [ ${#WANT[@]} -gt 0 ]; then
     local hit=0
     for w in "${WANT[@]}"; do [ "$w" = "$page" ] && hit=1; done
@@ -113,11 +127,35 @@ run() { # tag refpath candpath sections
     fi
   fi
   echo "########## $page ##########"
+  # Same clock source and same format as page-diff's own meta.generatedAt, so
+  # the freshness comparison below is between two ISO strings from one clock.
+  local started
+  started="$(node -e 'process.stdout.write(new Date().toISOString())')"
   node "$PD" --ref "$REF$refpath" --cand "$CAND$candpath" \
     --viewports "$MATRIX" --threshold "$THRESHOLD" \
     --sections "$sections" --out "matching/out-$TAG-$page" \
     > "matching/out-$TAG-$page.log" 2>&1
-  echo "$page exit=$?"
+  # IMMEDIATELY after the invocation. Any command in between — the echo
+  # included — destroys $?.
+  local status=$?
+  echo "$page exit=$status"
+  ATTEMPTED=$((ATTEMPTED + 1))
+  # $status may DENY a green; it may never GRANT one, and here it does neither.
+  # page-diff exits 1 for a region that legitimately FAILED (page-diff.mjs:227)
+  # and node exits 1 for the bare `throw e` below it, so the status cannot tell
+  # a finding from a crash before it looked — and a matching round's steady
+  # state IS a failing gate, so denying on it would break every normal round.
+  # Measured on 29 Navy with the reference alive and no dev server: `home
+  # exit=1`, `ALL DONE`, exit 0, and no matching/out-*-home/ written at all.
+  # What only a completed run leaves is the report next.mjs will count.
+  # census.sh:17-32 is the same argument for style-census.
+  local evidence
+  if evidence="$(node "$(dirname "$0")/harness.mjs" --check-run "$page" "matching/out-$TAG-$page" "$started" 2>&1)"; then
+    MEASURED=$((MEASURED + 1))
+  else
+    UNMEASURED="$UNMEASURED $page"
+    echo "  NOT MEASURED: $evidence"
+  fi
 }
 
 # The page table is matching/harness.json. Process substitution, NOT a pipe:
@@ -127,11 +165,45 @@ while IFS=$'\t' read -r key refpath candpath anchors; do
   run "$key" "$refpath" "$candpath" "$anchors"
 done < <(node "$(dirname "$0")/harness.mjs" --table)
 
+# BOTH kinds of incompleteness are reported in one run: a page refused before
+# it ran, and a page that ran and left nothing countable. Exiting on the first
+# would hide the second from an operator who then fixes only what was printed.
+INCOMPLETE=0
+if [ -n "$UNMEASURED" ]; then
+  echo
+  echo "GATE INCOMPLETE ($TAG) — $((ATTEMPTED - MEASURED)) of $ATTEMPTED page(s) produced no"
+  echo "countable report:$UNMEASURED"
+  echo "Those pages have NOT been measured. next.mjs drops an unreported page from"
+  echo "BOTH sides of the score, so the pages that did report would read as the"
+  echo "whole site. Full runs: matching/out-$TAG-<page>.log"
+  INCOMPLETE=1
+fi
 if [ "${FAILED_PREFLIGHT:-0}" = "1" ]; then
   echo
   echo "GATE INCOMPLETE ($TAG) — one or more pages were refused for a missing"
   echo "SPEC.md section. Those pages have NOT been measured; do not report a"
   echo "score for them."
+  INCOMPLETE=1
+fi
+if [ "$INCOMPLETE" = "1" ]; then
   exit 2
 fi
-echo "ALL DONE ($TAG)"
+# A green over ZERO pages is still a green. Measured: `gate.sh nosuch
+# nosuchpage` printed ALL DONE and exited 0 having run nothing and printed no
+# page header at all. census.sh:199-209 refuses exactly this shape, and
+# strikes.mjs:147-156 was written because a typo silently greened rule 3 on six
+# of nine pages.
+if [ "$ATTEMPTED" -eq 0 ]; then
+  if [ -n "$SEEN" ]; then
+    echo "gate.sh: \"${WANT[*]:-}\" matches no page — refusing to report ALL DONE." >&2
+    echo "         known pages:$SEEN" >&2
+  else
+    echo "gate.sh: the page table is empty — refusing to report ALL DONE." >&2
+    echo "         node matching/harness.mjs --table printed no rows; check" >&2
+    echo "         \"pages\" in matching/harness.json." >&2
+  fi
+  exit 2
+fi
+# A green that STATES what it is made of (census.sh:219), so a green over
+# nothing cannot read like a green over the table.
+echo "ALL DONE ($TAG) — $MEASURED of $ATTEMPTED page(s) measured, each one counted."
