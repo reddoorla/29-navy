@@ -39,7 +39,8 @@ const config = {
       // rendered by the home page's slices, and the slices are CMS content: they
       // exist today on /dev/match/home, which reads src/lib/site-pages.js
       // directly, and they will exist on `/` the moment that same module is
-      // published through `reddoor-maint prismic-seed`. The Prismic repo is real
+      // published through the Migration API (no seed exists yet: see the header
+      // of src/lib/site-pages.js). The Prismic repo is real
       // ("29-navy", not the sentinel) but carries no home document yet, so `/`
       // prerenders empty and every chrome anchor is missing by construction.
       //

@@ -1,8 +1,14 @@
 // The page assemblies for this site — the SINGLE source of truth for both
-// consumers: `reddoor-maint prismic-seed`, which publishes them through the
-// Migration API, and src/routes/dev/match/[uid], the local matching surface.
-// Because both read from here, any fix made to pass a gate is a fix to what
-// ships.
+// consumers: src/routes/dev/match/[uid], the local matching surface, and the
+// seed that publishes them through Prismic's Migration API. Because both read
+// from here, any fix made to pass a gate is a fix to what ships.
+//
+// THE SEED DOES NOT EXIST YET. Earlier comments here, in svelte.config.js and
+// in two harness-owned files name `reddoor-maint prismic-seed`; verified
+// against reddoor-maint 0.93.1's own --help, there is no such command and never
+// was. The machinery is all present — scripts/import/migrate.example.ts is a
+// worked createWriteClient/createMigration/createAsset example — but nothing
+// wires THIS module to it. Writing that is the work, not running it.
 //
 // THE MIGRATION API DROPS SILENTLY. It validates against the slice models
 // registered in Prismic and discards every field the model does not declare —

@@ -41,8 +41,8 @@ describe("the page slice zone", () => {
   });
 
   it("accepts every slice type the seed actually publishes", async () => {
-    // The assertion that stands directly between `reddoor-maint prismic-seed`
-    // and another empty home page. site-pages.js is the seed's input.
+    // The assertion that stands directly between the seed and another empty
+    // home page. site-pages.js is the seed's input.
     const used = [
       ...new Set(
         documents(() => ({})).flatMap((d) =>

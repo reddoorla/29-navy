@@ -917,3 +917,38 @@ offer an editor nine ways to break the match. The `Creative Lofts` region is
 still a measurement floor, not a build defect, and the harness fix behind it —
 freezing CSS/JS animation the way `capture.mjs` already freezes `<video>` — is
 still unfiled.
+
+### Addendum, same day — the seed command does not exist
+
+Written after the entry above, which says the seed is blocked behind merging
+#12. That is true and it is not the whole blocker. While checking that
+`reddoor-maint prismic-seed` would work after the merge, I ran the CLI's own
+`--help`: **there is no such command.** 0.93.1 exposes 27 commands; the
+Prismic-adjacent ones are `prismic-ci`, `prismic-models`, and the `migrate`
+actions of `blux` and `webflow`. `grep -rl prismic-seed` over the installed
+`dist/` returns nothing, and over the source repo's `src/` returns nothing.
+
+Five files in this repo name it. I wrote three of them in Phase 2 —
+`site-pages.js`'s header, `svelte.config.js`'s allowlist comment, and (today)
+`slice-zone.test.ts` — describing a tool I never checked existed, in the same
+session as the code they describe. That is precisely the hypothesis-not-a-record
+trap the six rules name, and knowing the rule did not stop me writing it three
+times. Corrected in those three. The other two are recipe-owned
+(`site-pages.test.ts`, `dev/match/[uid]/+page.server.ts`) and a site must not
+hand-edit them; filed as reddoorla/reddoor-maintenance#763, which also asks
+whether the class has more members — it is the second known instance after
+\#732's `probe-anchor-parity.mjs`.
+
+The route file makes the strongest version of the claim: it says the dev surface
+renders _exactly what the seed publishes_. That cannot be true of a seed that
+was never written, and it is the sentence that made "one command away from live"
+feel settled for a whole phase.
+
+So the real remaining work is not "run the seed" but "write the seed". The
+machinery is present twice over: `scripts/import/migrate.example.ts` is a worked
+`createWriteClient`/`createMigration`/`createAsset` example, and `webflow
+migrate` already pushes docs + assets through a shared runner. What is missing
+is anything that takes `documents(img)` from `site-pages.js` as its input and
+uploads the ~30 images as Prismic assets. That is a real piece of work and it
+writes to a live CMS, so it is the operator's call to start, not a loose end to
+tidy.
