@@ -952,3 +952,44 @@ is anything that takes `documents(img)` from `site-pages.js` as its input and
 uploads the ~30 images as Prismic assets. That is a real piece of work and it
 writes to a live CMS, so it is the operator's call to start, not a loose end to
 tidy.
+
+### Addendum 2, same day — 25 images of authored alt text that cannot reach the page
+
+Found while working out what the seed's inputs would have to be, after #12
+merged. Every `navy_*` slice's `mocks.json` carries real authored alt text — 25
+of 25 image fields, and it is good text. None of it can reach a rendered page.
+`site-pages.js` resolves images through `img(url)`, a URL and nothing else, and
+`dev/match/[uid]` hard-codes `alt: null`. Every component does the right thing
+with what it is handed (`alt={photo.alt ?? ""}`), so the result is `alt=""`
+everywhere except the hero's logo and mobile aerial, which carry hardcoded
+`REF_*` fallbacks. `mocks.json` is Slice Machine preview data: read by the
+previewer and by the slice tests, and by nothing that renders the site.
+
+Third instance today of one shape — authored content in a file the path to
+production does not read — after the slice zone and the gitignored capture. In
+all three the mechanical checks were green because each was asking a question
+the gap did not answer. Here the checks are _structurally_ incapable: `alt=""`
+is valid markup, so the axe gate reports 0 violations and always will, and
+`NavyContact.test.ts`'s test named `authors real alt text instead of the
+reference's alt=""` passes because it supplies alt in its own fixture rather
+than through the delivery path. I wrote that test believing it covered this.
+
+`LEDGER.md` records authoring real alt text as a deliberate accepted deviation
+from the reference, taken knowingly at the cost of a text diff. In the shipping
+path that deviation does not exist. The ledger says it was decided; it was not
+delivered — and the ledger is the document a launch sweep trusts on exactly this
+question.
+
+Filed as #13 rather than fixed here, because widening `img()` to carry alt is a
+change to the contract the seed will be written against, and the seed does not
+exist yet (Addendum 1). Doing it before the seed means the alt text lands in
+Prismic where an editor can maintain it; doing it after means typing 25 strings
+into the CMS by hand.
+
+**State at end of session.** #12 merged as `800ceb5`; CI green on main;
+`prismic-models` applied 6/6 models, and Prismic independently confirms 14
+shared slices and all 14 slice-zone choices on the `page` type. So the CMS is
+now capable of holding this page, and holds an empty `home` document. Three
+issues open: reddoorla/claude-skills#2 (harness animation freeze, behind the
+Creative Lofts floor), reddoorla/reddoor-maintenance#763 (the recipe naming a
+seed command that does not exist), and #13 (this).
