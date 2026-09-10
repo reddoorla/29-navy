@@ -1,0 +1,342 @@
+[
+  {
+    "__TYPE__": "SharedSliceContent",
+    "variation": "default",
+    "primary": {
+      "title": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Lofts"
+      },
+      "intro": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Hover or click on a floor"
+      },
+      "pdf_label": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Download a PDF of this floor"
+      },
+      "floors": {
+        "__TYPE__": "GroupContentType",
+        "value": [
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "1e2a6c74-4c1f-4d6b-9a2f-4e2d3a5b6c71",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "4th Floor - Penthouse"
+                }
+              ],
+              [
+                "floorplan",
+                {
+                  "url": "/29navy/assets/68a8ab2e97a0127295e1fc5a_floorplan-level-4_label.png",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/68a8ab2e97a0127295e1fc5a_floorplan-level-4_label.png",
+                    "width": 2402,
+                    "height": 1392
+                  },
+                  "width": 2402,
+                  "height": 1392,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "Floor plan of the fourth floor at 29 Navy: one full-floor penthouse loft, numbered 45, wrapping the stair and elevator core at the east end.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ],
+              [
+                "pdf",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "b0d1f4a2-5c63-4f18-9a77-2c0e5d8b1f34",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "https://29navy.com/pdf/file4.pdf",
+                    "target": "_blank"
+                  }
+                }
+              ],
+              [
+                "open_by_default",
+                {
+                  "__TYPE__": "BooleanContent",
+                  "value": false
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "2f3b7d85-5d20-4e7c-8b30-5f3e4b6c7d82",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "3rd Floor"
+                }
+              ],
+              [
+                "trigger_image",
+                {
+                  "url": "/29navy/assets/615330625afda8f3e747c53f_Untitled%20design%20(16).png",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/615330625afda8f3e747c53f_Untitled%20design%20(16).png",
+                    "width": 216,
+                    "height": 50
+                  },
+                  "width": 216,
+                  "height": 50,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "Button artwork reading 3rd Floor in white stencil type on black.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ],
+              [
+                "floorplan",
+                {
+                  "url": "/29navy/assets/68a8ab2eb4bb6bfe07128d9b_floorplan-level-3_label.png",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/68a8ab2eb4bb6bfe07128d9b_floorplan-level-3_label.png",
+                    "width": 2402,
+                    "height": 1392
+                  },
+                  "width": 2402,
+                  "height": 1392,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "Floor plan of the third floor at 29 Navy: eight lofts numbered 31 to 38, in two facing rows off a central corridor.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ],
+              [
+                "pdf",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "c1e2a5b3-6d74-4a29-8b88-3d1f6e9c2a45",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "https://29navy.com/pdf/file3.pdf",
+                    "target": "_blank"
+                  }
+                }
+              ],
+              [
+                "open_by_default",
+                {
+                  "__TYPE__": "BooleanContent",
+                  "value": false
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "3a4c8e96-6e31-4f8d-9c41-6a4f5c7d8e93",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "2nd Floor"
+                }
+              ],
+              [
+                "trigger_image",
+                {
+                  "url": "/29navy/assets/6153308fcb691617e9de8587_Untitled%20design%20(17).png",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/6153308fcb691617e9de8587_Untitled%20design%20(17).png",
+                    "width": 216,
+                    "height": 50
+                  },
+                  "width": 216,
+                  "height": 50,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "Button artwork reading 2nd Floor in white stencil type on black.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ],
+              [
+                "floorplan",
+                {
+                  "url": "/29navy/assets/68a8a9f0547387a3619409d7_floorplan-level-1_label.png",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/68a8a9f0547387a3619409d7_floorplan-level-1_label.png",
+                    "width": 2402,
+                    "height": 1392
+                  },
+                  "width": 2402,
+                  "height": 1392,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "Floor plan of the second floor at 29 Navy: eight lofts numbered 21 to 28, in two facing rows off a central corridor.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ],
+              [
+                "pdf",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "d2f3b6c4-7e85-4b3a-9c99-4e2a7f0d3b56",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "https://29navy.com/pdf/file2.pdf",
+                    "target": "_blank"
+                  }
+                }
+              ],
+              [
+                "open_by_default",
+                {
+                  "__TYPE__": "BooleanContent",
+                  "value": false
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "4b5d9fa7-7f42-4a9e-8d52-7b5a6d8e9fa4",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "1st Floor"
+                }
+              ],
+              [
+                "trigger_image",
+                {
+                  "url": "/29navy/assets/615330c04bb71e65b9ff085c_Untitled%20design%20(18).png",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/615330c04bb71e65b9ff085c_Untitled%20design%20(18).png",
+                    "width": 216,
+                    "height": 50
+                  },
+                  "width": 216,
+                  "height": 50,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "Button artwork reading 1st Floor in white stencil type on black.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ],
+              [
+                "floorplan",
+                {
+                  "url": "/29navy/assets/68a8ab2e8c93e2fcae3bc02d_floorplan-level-1_label.png",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/68a8ab2e8c93e2fcae3bc02d_floorplan-level-1_label.png",
+                    "width": 2402,
+                    "height": 1392
+                  },
+                  "width": 2402,
+                  "height": 1392,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "Floor plan of the first floor at 29 Navy: eight lofts numbered 1 to 8, in two facing rows off a central corridor.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ],
+              [
+                "pdf",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "5c6e1ab8-8a53-4c0f-9e63-8c6b7e9fa0b5",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "https://29navy.com/pdf/file1.pdf"
+                  }
+                }
+              ],
+              [
+                "open_by_default",
+                {
+                  "__TYPE__": "BooleanContent",
+                  "value": true
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "items": []
+  }
+]

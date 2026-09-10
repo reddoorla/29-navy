@@ -1,0 +1,34 @@
+{
+  "id": "navy_location_band",
+  "type": "SharedSlice",
+  "name": "NavyLocationBand",
+  "description": "Full-viewport aerial photo band with a single heading",
+  "variations": [
+    {
+      "id": "default",
+      "name": "Default",
+      "docURL": "...",
+      "version": "initial",
+      "description": "Aerial photo standing 100vh tall, with one left-offset heading",
+      "imageUrl": "",
+      "primary": {
+        "heading": {
+          "type": "StructuredText",
+          "config": {
+            "label": "heading",
+            "single": "heading1"
+          }
+        },
+        "background_image": {
+          "type": "Image",
+          "config": {
+            "label": "background_image",
+            "constraint": {},
+            "thumbnails": []
+          }
+        }
+      },
+      "items": {}
+    }
+  ]
+}

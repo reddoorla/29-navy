@@ -9,15 +9,14 @@
   import LandscapeModal from "$lib/components/LandscapeModal.svelte";
   import TransitionOverlay from "$lib/components/TransitionOverlay.svelte";
   import Nav from "$lib/components/Nav.svelte";
-  import Footer from "$lib/components/Footer.svelte";
-  import { loadSiteConfig, footerColumns } from "$lib/site-config";
+  import { loadSiteConfig } from "$lib/site-config";
   import { disableSmoothScroll, restoreSmoothScroll } from "$lib/utils/instantNavScroll";
 
   let { data, children } = $props();
 
-  // Site chrome from src/lib/site-config.json (empty stub → logo-only Nav +
-  // placeholder Footer). A route's own page data takes precedence in each
-  // chrome component.
+  // Site chrome from src/lib/site-config.json — for 29 Navy that is the six
+  // reference nav links and the wordmark. A route's own page data still takes
+  // precedence. There is no footer on this site; see the note below the <main>.
   const siteConfig = loadSiteConfig();
 
   // Kit's own post-nav scroll (top / hash anchor / popstate restore) runs
@@ -42,9 +41,8 @@
 >
   Skip to main content
 </a>
-<!-- Chrome renders from page data when a route supplies navLinks/footerColumns,
-     else from the site-config stub. Each component applies its own
-     page-data-over-config precedence. -->
+<!-- Chrome renders from page data when a route supplies navLinks, else from
+     site-config. Nav applies its own page-data-over-config precedence. -->
 <div class="flex flex-col min-h-screen">
   <Nav navLinks={page.data.navLinks} items={siteConfig.nav.items} logo={siteConfig.nav.logo} />
 
@@ -52,11 +50,21 @@
     {@render children?.()}
   </main>
 
-  <Footer
-    columns={footerColumns(page.data.footerColumns, siteConfig)}
-    socials={siteConfig.footer.socials}
-    text={siteConfig.footer.text}
-  />
+  <!-- NO FOOTER. Sourced from the reference DOM, not inferred:
+       matching/spec/index.html ends `…</div><script …></script></body>` — the
+       last element is `#contact.section-7` and there is no <footer> anywhere in
+       the document. 29 Navy is a one-page site whose contact block IS the
+       footer.
+
+       This is a geometry fact, not a styling preference. <Footer> renders
+       unconditionally at `px-8 py-12` and, with the empty site-config stub,
+       still emits `© <year> Company Name` — about 140px of height the reference
+       does not have, at the bottom of the page, inside the last cut region. It
+       would also ship the literal words "Company Name" on a live site.
+
+       The shared component is left alone: src/lib/components/Footer.test.ts has
+       three assertions that the placeholder renders, so that behaviour is the
+       starter's intent and changing it belongs upstream, not here. -->
 </div>
 <TransitionOverlay />
 <LandscapeModal />

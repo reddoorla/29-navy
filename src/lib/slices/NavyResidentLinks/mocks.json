@@ -1,0 +1,517 @@
+[
+  {
+    "__TYPE__": "SharedSliceContent",
+    "variation": "default",
+    "primary": {
+      "heading": {
+        "__TYPE__": "StructuredTextContent",
+        "value": [
+          {
+            "type": "heading1",
+            "content": {
+              "text": "Residents"
+            }
+          }
+        ]
+      },
+      "tiles": {
+        "__TYPE__": "GroupContentType",
+        "value": [
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000002",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Paying rent online?"
+                }
+              ],
+              [
+                "link",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "b1f2c3d4-0000-4a00-8000-000000000001",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "https://payments.gozego.com/",
+                    "target": "_blank"
+                  }
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000003",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Hooking up electricity?"
+                }
+              ],
+              [
+                "modal",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Select",
+                  "value": "electric"
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000004",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Too busy to do laundry?"
+                }
+              ],
+              [
+                "modal",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Select",
+                  "value": "laundry"
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000005",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Looking for a gym?"
+                }
+              ],
+              [
+                "modal",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Select",
+                  "value": "gym"
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000006",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Connecting cable tv?"
+                }
+              ],
+              [
+                "modal",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Select",
+                  "value": "tv_internet"
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000007",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Plugging in internet?"
+                }
+              ],
+              [
+                "modal",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Select",
+                  "value": "tv_internet"
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000008",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Need a ride?"
+                }
+              ],
+              [
+                "modal",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Select",
+                  "value": "ride"
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "b1f2c3d4-0000-4a00-8000-000000000009",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Hungry?"
+                }
+              ],
+              [
+                "modal",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Select",
+                  "value": "food"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "electric_title": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Hooking up electricity?"
+      },
+      "electric_body": {
+        "__TYPE__": "StructuredTextContent",
+        "value": [
+          {
+            "type": "paragraph",
+            "content": {
+              "text": "Call LA DWP at 800.342.5397 and provide your new address, including unit number. They will ask for your contact information and the service start date. Once the account is active, you will receive a bi-monthly bill with electricity charges, as well as a bulky item collection fee of approximately $1.33 (subject to change based on current LA DWP rates)."
+            }
+          },
+          {
+            "type": "paragraph",
+            "content": {
+              "text": "If you have any large items to be disposed, you can call “800-773-2489” and make arrangements to have items picked up (pick-ups are every Tuesday)."
+            }
+          }
+        ]
+      },
+      "laundry_title": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Too busy to do your laundry?"
+      },
+      "laundry_logo": {
+        "url": "/29navy/assets/614def0e7bf7b30746beec9d_logo-modal-washio.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614def0e7bf7b30746beec9d_logo-modal-washio.png",
+          "width": 555,
+          "height": 169
+        },
+        "width": 555,
+        "height": 169,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Rinse, formerly Washio — pickup and delivery laundry service",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "laundry_link": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000010",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "https://www.rinse.com/getwashio?utm_source=www.getwashio.com&utm_campaign=washio_redirect&utm_promo=getwashio"
+        }
+      },
+      "gym_title": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Looking for a gym?"
+      },
+      "gym_logo_1": {
+        "url": "/29navy/assets/614dfdbeeca57714e0b275e0_golds-gym-logo-png-11552727817xfevltaaqp-removebg-preview.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614dfdbeeca57714e0b275e0_golds-gym-logo-png-11552727817xfevltaaqp-removebg-preview.png",
+          "width": 494,
+          "height": 505
+        },
+        "width": 494,
+        "height": 505,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Gold’s Gym Venice",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "gym_link_1": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000011",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "http://www.goldsgym.com/veniceca/",
+          "target": "_blank"
+        }
+      },
+      "gym_logo_2": {
+        "url": "/29navy/assets/614dfca76c78053dab7d696f_logo-modal-classpass.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614dfca76c78053dab7d696f_logo-modal-classpass.png",
+          "width": 554,
+          "height": 75
+        },
+        "width": 554,
+        "height": 75,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "ClassPass",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "gym_link_2": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000012",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "https://classpass.com/"
+        }
+      },
+      "tv_title": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "connecting cable tv?"
+      },
+      "tv_logo": {
+        "url": "/29navy/assets/614e015fb3f528b5d65f8192_logo-modal-fios.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614e015fb3f528b5d65f8192_logo-modal-fios.png",
+          "width": 246,
+          "height": 149
+        },
+        "width": 246,
+        "height": 149,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Verizon Fios",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "tv_link": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000013",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "http://fios.verizon.com/",
+          "target": "_blank"
+        }
+      },
+      "tv_body": {
+        "__TYPE__": "StructuredTextContent",
+        "value": [
+          {
+            "type": "paragraph",
+            "content": {
+              "text": "Contact Building Management at 310-393-9653 and a dedicated Verizon Account Representative will respond to your inquiry and provide information and set-up your account."
+            }
+          }
+        ]
+      },
+      "ride_title": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "need a ride?"
+      },
+      "ride_logo_1": {
+        "url": "/29navy/assets/614e04a52a076aebf5fb883e_logo-modal-lyft.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614e04a52a076aebf5fb883e_logo-modal-lyft.png",
+          "width": 339,
+          "height": 240
+        },
+        "width": 339,
+        "height": 240,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Lyft",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "ride_link_1": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000014",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "https://www.lyft.com/",
+          "target": "_blank"
+        }
+      },
+      "ride_logo_2": {
+        "url": "/29navy/assets/614e04ae200f160bc3dd791f_logo-modal-uber.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614e04ae200f160bc3dd791f_logo-modal-uber.png",
+          "width": 800,
+          "height": 113
+        },
+        "width": 800,
+        "height": 113,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Uber",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "ride_link_2": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000015",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "https://www.uber.com/",
+          "target": "_blank"
+        }
+      },
+      "food_title": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Hungry?"
+      },
+      "food_logo_1": {
+        "url": "/29navy/assets/614e083adb033884c9babd48_logo-modal-postmates.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614e083adb033884c9babd48_logo-modal-postmates.png",
+          "width": 500,
+          "height": 430
+        },
+        "width": 500,
+        "height": 430,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Postmates",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "food_link_1": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000016",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "https://postmates.com/los-angeles",
+          "target": "_blank"
+        }
+      },
+      "food_logo_2": {
+        "url": "/29navy/assets/614e0828dc5ca9db01c4b415_logo-modal-uber-eats.png",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614e0828dc5ca9db01c4b415_logo-modal-uber-eats.png",
+          "width": 555,
+          "height": 108
+        },
+        "width": 555,
+        "height": 108,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Uber Eats",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "food_link_2": {
+        "__TYPE__": "LinkContent",
+        "key": "b1f2c3d4-0000-4a00-8000-000000000017",
+        "value": {
+          "__TYPE__": "ExternalLink",
+          "url": "https://ubereats.com/eats/la/",
+          "target": "_blank"
+        }
+      }
+    },
+    "items": []
+  }
+]

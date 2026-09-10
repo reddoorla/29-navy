@@ -50,9 +50,9 @@ const EXPECT = {
   htmlAssets: 58,
   fonts: 12,
   fontSvg: 3,
-  cssPhotos: 10,
+  cssPhotos: 13,
   cssOther: 1,
-  files: 90,
+  files: 93,
 };
 
 const FONT_EXT = /\.(?:woff2?|eot|ttf|otf)$/i;
@@ -111,8 +111,21 @@ if (sheets.length !== EXPECT.css) die(`expected ${EXPECT.css} stylesheet, found 
 const sheet = await get(sheets[0]);
 if (sheet.status !== 200) die(`stylesheet ${sheets[0]} returned ${sheet.status}`);
 
-for (const m of sheet.buf.toString("utf8").matchAll(/url\(\s*(["']?)([^)"']+)\1\s*\)/g)) {
-  const raw = m[2].trim();
+// Three alternatives, not one optional-quote class. The obvious form —
+// /url\(\s*(["']?)([^)"']+)\1\s*\)/ — cannot match a QUOTED url whose filename
+// contains a parenthesis, because its character class excludes `)` and so the
+// value dies at the `(` before the closing quote is ever reached. Measured on
+// this site's own stylesheet: 26 url()s found instead of 29, and the three lost
+// were `…_Untitled design (16|17|18).png` (css:2968, :2997, :3023) — the three
+// floor-trigger tiles the Lofts section is built from. The capture reported 90
+// files, every one 200, and EXPECT agreed with it, because EXPECT had been
+// written from that same broken output. An unquoted url() genuinely cannot
+// contain an unescaped paren, so only the quoted arms need to admit one.
+for (const m of sheet.buf
+  .toString("utf8")
+  .matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/g)) {
+  const raw = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+  if (!raw) continue;
   if (raw.startsWith("data:")) continue;
   const u = abs(raw, sheets[0]);
   const name = decodeURIComponent(basename(new URL(u).pathname));

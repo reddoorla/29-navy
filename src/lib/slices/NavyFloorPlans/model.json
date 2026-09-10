@@ -1,0 +1,87 @@
+{
+  "id": "navy_floor_plans",
+  "type": "SharedSlice",
+  "name": "NavyFloorPlans",
+  "description": "Floor-plan panel switcher — a column of floor triggers beside one open floor panel",
+  "variations": [
+    {
+      "id": "default",
+      "name": "Default",
+      "docURL": "...",
+      "version": "initial",
+      "description": "Four floor triggers in a left column, with one floor plan panel open beside them",
+      "imageUrl": "",
+      "primary": {
+        "title": {
+          "type": "Text",
+          "config": {
+            "label": "title",
+            "placeholder": "e.g. Lofts"
+          }
+        },
+        "intro": {
+          "type": "Text",
+          "config": {
+            "label": "intro",
+            "placeholder": "e.g. Hover or click on a floor"
+          }
+        },
+        "pdf_label": {
+          "type": "Text",
+          "config": {
+            "label": "pdf_label",
+            "placeholder": "e.g. Download a PDF of this floor"
+          }
+        },
+        "floors": {
+          "type": "Group",
+          "config": {
+            "label": "floors",
+            "fields": {
+              "label": {
+                "type": "Text",
+                "config": {
+                  "label": "label",
+                  "placeholder": "e.g. 4th Floor - Penthouse"
+                }
+              },
+              "trigger_image": {
+                "type": "Image",
+                "config": {
+                  "label": "trigger_image",
+                  "constraint": {},
+                  "thumbnails": []
+                }
+              },
+              "floorplan": {
+                "type": "Image",
+                "config": {
+                  "label": "floorplan",
+                  "constraint": {},
+                  "thumbnails": []
+                }
+              },
+              "pdf": {
+                "type": "Link",
+                "config": {
+                  "label": "pdf",
+                  "allowTargetBlank": true
+                }
+              },
+              "open_by_default": {
+                "type": "Boolean",
+                "config": {
+                  "label": "open_by_default",
+                  "placeholder_false": "hidden at rest",
+                  "placeholder_true": "open at rest",
+                  "default_value": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "items": {}
+    }
+  ]
+}

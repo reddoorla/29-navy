@@ -1,0 +1,157 @@
+[
+  {
+    "__TYPE__": "SharedSliceContent",
+    "variation": "default",
+    "primary": {
+      "heading": {
+        "__TYPE__": "StructuredTextContent",
+        "value": [
+          {
+            "type": "heading1",
+            "content": {
+              "text": "Contact"
+            }
+          }
+        ]
+      },
+      "address_line_1": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "29 Navy Street "
+      },
+      "address_line_2": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Venice, California 90291 "
+      },
+      "links": {
+        "__TYPE__": "GroupContentType",
+        "value": [
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "0f2c9a41-6b70-4d2e-9c31-1a7f5d8e4b02",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Call us: "
+                }
+              ],
+              [
+                "value",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "(310) 393-9657"
+                }
+              ],
+              [
+                "target",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "c3a1d5f8-9e42-4b06-8d77-2f5b1c0a6e93",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "tel:+13103939657"
+                  }
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "7d84b1e0-3c56-4a19-9f28-6b0e2d7c5a14",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Email us:"
+                }
+              ],
+              [
+                "value",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "29navy@worthe.com"
+                }
+              ],
+              [
+                "target",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "b58e0c27-1d93-4f6a-a20b-84c7e3f19d65",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "mailto:29navy@worthe.com"
+                  }
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "a1963f74-5820-4ec3-b16d-9c48e7025f3b",
+            "value": [
+              [
+                "label",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Find us on:"
+                }
+              ],
+              [
+                "value",
+                {
+                  "__TYPE__": "FieldContent",
+                  "type": "Text",
+                  "value": "Zillow"
+                }
+              ],
+              [
+                "target",
+                {
+                  "__TYPE__": "LinkContent",
+                  "key": "e40d7b52-8a61-4c39-95f0-3d21b6a8c7e4",
+                  "value": {
+                    "__TYPE__": "ExternalLink",
+                    "url": "https://www.zillow.com/apartments/venice-ca/29-navy-creative-lofts/ChqQtg/"
+                  }
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "photo": {
+        "url": "/29navy/assets/68b712e52ecd74e0d37afd1d_matthew-lejune-dv1r5Pftdzk-unsplash.jpg",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/68b712e52ecd74e0d37afd1d_matthew-lejune-dv1r5Pftdzk-unsplash.jpg",
+          "width": 4240,
+          "height": 2832
+        },
+        "width": 4240,
+        "height": 2832,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Sunlight falling across the brick facade and steel-framed windows of the 29 Navy building.",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      }
+    },
+    "items": []
+  }
+]
