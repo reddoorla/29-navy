@@ -4,7 +4,13 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { NotFoundError } from "@prismicio/client";
 
-import { assetPath, buildPlan, createImageResolver, formatReport } from "./seed-home.mjs";
+import {
+  assetPath,
+  buildPlan,
+  createImageResolver,
+  formatReport,
+  verifyPublished,
+} from "./seed-home.mjs";
 import { documents } from "../../src/lib/site-pages.js";
 
 const ROOT = process.cwd();
@@ -192,5 +198,71 @@ describe("formatReport", () => {
     expect(report).toContain("slices: 0 → 1  [navy_contact]");
     expect(report).toContain("alt: An alt.");
     expect(report).toContain("the assets are not");
+  });
+});
+
+describe("verifyPublished", () => {
+  const plan = [
+    { assembly: { type: "page", uid: "home" }, slices: [{ slice_type: "a" }, { slice_type: "b" }] },
+  ];
+  const REFS = { refs: [{ isMasterRef: true, ref: "master-ref" }] };
+  const withSlices = (n: number) => ({ results: [{ data: { slices: Array(n).fill({}) } }] });
+
+  const run = (pages: Array<number>, extra = {}) => {
+    const urls: string[] = [];
+    let call = 0;
+    return {
+      urls,
+      result: verifyPublished({
+        repositoryName: "r",
+        plan,
+        sleep: async () => {},
+        nonce: () => `n${++call}`,
+        fetchJson: async (url: string) => {
+          urls.push(url);
+          if (url.includes("/documents/search"))
+            return withSlices(
+              pages[
+                Math.min(urls.filter((u) => u.includes("search")).length - 1, pages.length - 1)
+              ],
+            );
+          return REFS;
+        },
+        ...extra,
+      }),
+    };
+  };
+
+  it("passes only when the PUBLISHED ref carries the slices", async () => {
+    expect(await run([2]).result).toEqual([{ uid: "home", want: 2, got: 2 }]);
+  });
+
+  it("throws, naming both counts, when the release was staged but not published", async () => {
+    // The failure this function exists for: migrate() writes into the migration
+    // release and returns cleanly while the published document keeps its old
+    // content. Treating that clean return as success printed "done" over a page
+    // that still had zero slices.
+    await expect(run([0], { attempts: 2 }).result).rejects.toThrow(
+      /0 slice\(s\) live, expected 2[\s\S]*unpublished/,
+    );
+  });
+
+  it("retries, because the published ref lags the publish call", async () => {
+    expect((await run([0, 0, 2]).result)[0].got).toBe(2);
+  });
+
+  it("busts the CDN cache on every request", async () => {
+    // Not decoration. The first version of this used a fresh Client per attempt
+    // and still read a stale master ref every time, because /api/v2 is served
+    // from a URL-keyed CDN edge — so it reported 0 slices over content that WAS
+    // published. A changing query parameter is the only thing that defeats it,
+    // and a retry loop without one is theatre.
+    const { urls, result } = run([0, 2]);
+    await result;
+    expect(urls.length).toBeGreaterThan(2);
+    for (const u of urls) expect(u, `${u} has no cache-buster`).toMatch(/[?&]_=n\d+/);
+    // A different nonce on the second attempt, or the retry re-reads the first
+    // attempt's cached response.
+    expect(new Set(urls.map((u) => u.match(/_=(n\d+)/)![1])).size).toBeGreaterThan(1);
   });
 });

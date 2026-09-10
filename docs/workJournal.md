@@ -1069,3 +1069,57 @@ printed in the dry-run footer so it is in front of whoever types the command.
 After a successful run the `AWAITING_SEED` allowlist in `svelte.config.js` comes
 out. `meta_title` and `meta_description` on the home document are still null;
 the seed deliberately does not invent them.
+
+### Addendum, same day — the seed ran, and reported success over an empty page
+
+`--apply` uploaded 24 assets, updated the document, printed `✔ done`, and left
+`/` with zero slices. Both halves of that are worth keeping.
+
+**`migrate()` stages; it does not publish.** It writes into Prismic's _migration
+release_, and the published document is untouched until
+`publishMigrationRelease()`. `@prismicio/client` says so in
+`migrateUpdateDocuments`' own JSDoc — _"Updates documents in the Prismic
+repository's migration release"_ — and its usage example calls publish on the
+very next line. I read `createAsset`, `createDocument`, `updateDocument` and
+`WriteClient.js:163` closely enough to get the create-vs-update semantics right,
+and never read the two lines after the call I was copying. The script then
+reported success on a clean exit — the exact shape the first of the six rules
+names, in the one place tonight where it was irreversible.
+
+Caught because the plan was to verify in Prismic afterwards, not because
+anything in the script objected. Nothing in it could have: it had no idea what
+"live" meant.
+
+**Then the verifier I wrote to fix it returned a false negative.** First version
+built a fresh Client per attempt, with a comment explaining that a Client caches
+the master ref it first resolves — true, and beside the point. `/api/v2` is
+served from a **URL-keyed CDN edge**, so every fresh Client received the same
+stale ref and the retry loop was theatre for a different reason than the comment
+claimed. It printed `0 slice(s) live, expected 5` over content that was already
+published; the direct query that disproved it differed only by a random query
+parameter. Now a plain cache-busted fetch, and a test asserts every request
+carries `_=` and that the nonce changes between attempts — because a retry
+without one re-reads the first attempt's cached answer.
+
+Both failures are the same mistake at different distances from the truth: taking
+a thing that returned cleanly as a thing that worked.
+
+**What is live.** `publishMigrationRelease()` moved it; the fixed `--verify`
+reads `home: 5 slice(s) live, expected 5` off the published ref. The document is
+one page (not two — the uid lookup held), all 24 assets resolved to
+`images.prismic.io`, and **every alt string arrived**: "29 Navy", "Lyft",
+"Sunlight falling across the brick facade…". Both aerial usages point at one
+asset id, `ma98hXBLD58eEQjF`, so the dedup survived the round trip.
+
+`svelte.config.js`'s four-id `AWAITING_SEED` allowlist is deleted. That turns
+`handleMissingId` back into a real check, and it is now the evidence: `pnpm
+verify` prerenders `/` from live Prismic with no allowlist and passes, so
+`Location`, `Lofts`, `Residents` and `contact` all exist on the page. The
+prerendered `index.html` is **44,721 bytes** against 6,951 before, carries all
+five `data-slice-type` markers and 75 `images.prismic.io` references.
+
+`--publish` and `--verify` exist as separate modes because of this: the resume
+path is what you need when staging succeeded and publishing did not, and
+re-running `--apply` would have uploaded all 24 assets a second time.
+
+`pnpm verify`: **55 files, 472 tests, 4 smoke, exit 0.**
