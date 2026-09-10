@@ -646,3 +646,53 @@ reading the line it names. The gate was watched refusing for a missing
 `## home` section **before** `SPEC.md` existed, because once the file exists
 that refusal cannot be reproduced without deleting it again, and a gate never
 seen to refuse is not evidence that it can.
+
+## 2026-09-10 — The installed harness was the one that could lie, upgraded in place (`maint/match-harness-20260910T172826020Z`)
+
+This site installed its harness from `@reddoorla/maintenance@0.95.0` and then
+stayed there while four defects were found in that exact code — by _using_ it
+here, not by reviewing it. Fixing them upstream reached nobody: a recipe-owned
+file that matches neither the new template nor a recorded previous body is
+FLAGGED, never overwritten, so an installed site keeps the broken script forever
+and is told it hand-edited a file it never touched. The fleet fix (#753) was to
+record what had been shipped; this run is that fix arriving.
+
+**What was here, measured before the run.** `matching/gate.sh` with zero of the
+`MEASURED` / `ATTEMPTED` / `SEEN` counters and no `--check-run` — the gate that
+printed `ALL DONE` unconditionally, over runs that had failed or never happened
+(#744). `matching/harness.mjs` with neither `scorable` nor `unscorableWhy`, so
+`next.mjs` divided real passes by a denominator describing a region layout that
+does not exist and printed `SCORE 16/4 … Backlog is empty` (#751). And zero
+terminators in all three marked blocks — `.gitignore`, `.prettierignore`,
+`CLAUDE.md` — meaning their contents could never be corrected at all (#739),
+which on `.gitignore` is not staleness but a brick: it is a negated whitelist
+over `matching/*`, so a harness file at a path it does not re-include never
+reaches the commit and the whole install gets reverted.
+
+**Predicted, then run.** Before running anything, the real `planFileWrite` was
+executed against this site's actual bytes for all 17 recipe files: `replace` for
+`harness.mjs`, `gate.sh` and `next.mjs`, `skip` for the other fourteen, `flag`
+for none. The run then reported exactly that — three upgraded, three block
+regions terminated — plus 436 insertions and 24 deletions across 6 files. The
+prediction mattered because a `flag` here would have been silent: the recipe
+still reports `applied`, and the note naming the flagged file is the only
+signal.
+
+**The upgraded harness refuses on contact, which is the point.**
+`node matching/next.mjs` now exits 2 with _"no parseable gate run under
+matching/ — refusing to report a score"_. The two Phase 0/1 logs still sitting
+in `matching/` (`out-smoke-home.log`, `out-smoke2-home.log`) are pre-#744 schema,
+so `uncountable()` declines to count them rather than scoring stale evidence.
+The old harness would have scored them and called it a number. Phase 2 therefore
+starts from a real gate run, not from what was lying around.
+
+**A trap worth recording, because it cost a wrong reading in the same hour it
+was written down.** `node matching/next.mjs | head` reports `$?` as `head`'s
+status under zsh, not the script's — read as exit 0 when the real answer is 2.
+`${PIPESTATUS[0]}` is a bash spelling and is empty here; zsh wants
+`$pipestatus[1]`. Measure an exit code without a pipe, or not at all.
+
+**Not done.** `matching/harness.json` is site-owned and was skipped, so `--ref`
+was inert on this re-run — the four anchors, the `[1440, 991, 767, 390]` matrix
+and `TOTALS.home = 20` are unchanged and still this site's own. Nothing has
+re-run the gate yet, so the site has no countable run and no score.
