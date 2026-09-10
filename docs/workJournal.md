@@ -750,3 +750,86 @@ and the gate will have something to measure.
 **Nothing was left running.** The `pnpm dev` on 5173 was stopped and the port
 released; `matching/out-smoke3-*` is covered by the harness block's negated
 whitelist in `.gitignore`, so the tree is clean.
+
+## 2026-09-10 (Phase 2) — The page exists, and four of the five failures were never geometry (`feat/navy-home-slices`)
+
+`SCORE 4/20 → 16/20` over five gate rounds. What follows is mostly about the
+four fixes that were **not** in the slices, because every one of them looked
+like a slice bug and none of them was.
+
+**The build.** Five slices — hero slider, Location band, floor plans, resident
+links, contact — assembled in `src/lib/site-pages.js`, with 689 rules
+transcribed from the captured stylesheet and every one carrying the line it came
+from. All 40 asset references resolve to files shipped under `static/29navy/`.
+The four anchors occur exactly once each in the script-stripped text, at
+strictly increasing indices, which is the invariant SPEC.md's collision note
+demands; the duplicates a naive grep finds are SvelteKit's SSR payload inside
+`<script>`, which page-diff strips.
+
+**A `position` keyword cost the whole score.** The first gate refused: reference
+5 regions, candidate 4, `TRUNCATED`, uncountable. The starter's `Nav` is
+`position: fixed`; the reference's bar is `sticky` (css:2160-2161). Fixed leaves
+normal flow and contributes ZERO height, so the hero began at y=0 instead of
+y=68 and `regionsFromAnchors` never emitted a `top` region — with no gap above
+the first anchor there is nothing to cut. The tempting explanation was a
+falsy-zero bug in the region splitter; it filters on `a.y != null && a.y >= 0`,
+so y=0 is handled correctly. The region was genuinely absent.
+
+**The bar's 68px is emergent, and typing it in would have been wrong.** After
+`sticky` it measured 42 — exactly the logo alone (164 wide from an intrinsic
+986×253). The links were `display: inline` with no padding. Webflow's own
+`.w-nav-link` base (css:1823-1832) makes them `inline-block` with `padding:
+20px`: 28px line-height + 20 + 20 = 68. Transcribing the rule landed on 68
+exactly rather than approximately. Same story on mobile: `.w-nav-button` is a
+24px glyph in 18px of padding (css:1902-1903) = 60. Heights are now exact at all
+four viewports — 68 / 124 / 60 / 60.
+
+**Two owners for one property.** Transcribing `.container`'s `display: flex`
+(css:2168) onto the element whose display is controlled by `hidden md:flex` won
+the cascade, and at 390 the six links stayed on screen and stacked into a 384px
+bar against the reference's 60. The utility owns `display`; `md:flex` IS
+css:2168. One line later the same trap was waiting in `.w-nav-button`'s
+`display: none` (css:1904) — not transcribed, deliberately.
+
+**Fifteen pixels of page width read as a 47% hero defect.** The starter sets
+`scrollbar-gutter: stable`; the reference's only html rule is `height: 100%`
+(css:218-220). The gutter is reserved INSIDE the body: measured at 1440,
+`document.body` laid out at 1425 against 1440, so every full-bleed element was
+scaled and shifted by 1.04%. On six 100vh photo slides that is ~47% mismatch at
+all four viewports, and it presents as a hero bug. `clientWidth` reports 1440 on
+BOTH pages, which is why it survived a round of looking straight at it — and why
+I dismissed it out loud earlier the same session with "both have a scrollbar, so
+it's a wash". Removing it took the score 6/20 → 15/20 and made total page height
+4174 = 4174, exact.
+
+**The last four failures are the measurement, not the build.** `Creative Lofts`
+fails at 34-38% with `heightDeltaFraction` 0.0% and every element matching to
+the pixel. The reference is deterministic against itself (page-diff with the
+reference as both sides: 0.0%, ΔE 0.0). The slide photo the browser downloads is
+sha `b68497a0f75b8ed7` — byte-identical to the shipped file. The cause is that
+`capture.mjs` settles 2200ms and then spends **601ms** taking a fullPage
+screenshot of a 4174px page, while the reference's carousel advances at
+`data-delay="3000"`: its dot nav reads `*.....` at t=2200 and `.*....` at
+t=2801. Varying only the reference's settle, hero against hero: **600ms → 0.1%
+differ, 1500ms → 0.1%, 2800ms → 36.3%.** `--neutralize-media` does not help; it
+freezes `<video>`, and this is a JS-driven transform. Recorded in LEDGER.md as a
+novel floor, which rule 5 makes the operator's call — presented, not decided.
+
+**Corrected on contact.** Phase 0's capture was incomplete and said it was
+whole: its `url()` extractor could not match a QUOTED url whose filename
+contains a parenthesis, so it silently missed the three floor-trigger tiles
+(css:2968, :2997, :3023). It reported 90 files, all 200, and `EXPECT` agreed —
+because `EXPECT` had been written from that same broken output. That is an
+assertion calibrated to the defect. Now 93 files, `cssPhotos` 10 → 13. While
+fixing it I tried to syntax-check the script by importing it, which RAN it
+against the live reference; no damage, and it incidentally proved the reference
+had not drifted in 19 hours, but `node --check` on a copy was the safe move.
+
+**What is NOT done.** The home document is not seeded to Prismic, so `/` renders
+empty and the four section ids exist only on `/dev/match/home`;
+`svelte.config.js` carries an explicit four-id allowlist for that, marked for
+deletion at seed time. The slider does not move — frame 0 only, which is what
+the geometry gate measures and what Phase 5 will have to build. `next.mjs`
+instructs the operator to run `matching/probe-anchor-parity.mjs`, which the
+recipe does not install (reddoorla/reddoor-maintenance#732; the class is now
+bounded at exactly one dangling reference of thirteen).
