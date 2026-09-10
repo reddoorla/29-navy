@@ -1,0 +1,27 @@
+{
+  "ref": "https://www.29navy.com",
+  "cand": "http://localhost:5173",
+  "matrix": [
+    1440,
+    834,
+    390
+  ],
+  "threshold": 0.1,
+  "maxHeightDelta": 0.05,
+  "refMark": "data-wf-site=\"61411d5add9b561004cfbf8b\"",
+  "candMark": "_app/immutable",
+  "selfHosts": [
+    "29-navy.netlify.app"
+  ],
+  "pages": {
+    "home": {
+      "uid": "home",
+      "ref": "/",
+      "cand": "/dev/match/home",
+      "published": "/",
+      "anchors": [],
+      "spec": "home",
+      "group": "nav"
+    }
+  }
+}
