@@ -661,4 +661,32 @@ describe("NavyFloorPlans slice", () => {
     for (const i of [0, 1, 2, 3])
       expect((field(i, "floorplan") as { alt: string }).alt.length).toBeGreaterThan(20);
   });
+
+  describe("the three floor plans nobody can see yet", () => {
+    it("warms them after load, with the srcset the <img> will use", () => {
+      // Only the `open_by_default` plan is visible at rest; the other three are
+      // 2402x1392 PNGs inside hidden panels, so `loading="lazy"` defers each
+      // fetch until a hover — and the plan then arrives after the swap that is
+      // the whole point of the section. Measured on production before this:
+      // 2 of 12 hidden images fetched before any interaction; after, 12 of 12.
+      const SRC = readFileSync(resolve(HERE, "index.svelte"), "utf8");
+      expect(SRC).toContain("preloadHidden");
+      const block = SRC.slice(SRC.indexOf("const hiddenPlans"), SRC.indexOf("$effect("));
+      // srcset and sizes, not just src: these render under `sizes="100vw"` over
+      // a five-candidate ladder, so warming src alone caches the 2402w original
+      // and the browser then fetches the 1600w candidate anyway — two requests,
+      // and the pop-in survives.
+      expect(block).toContain("planSrcset(floor.floorplan)");
+      expect(block).toContain('sizes: "100vw"');
+      expect(block).toContain("floor.floorplan?.url");
+    });
+
+    it("does not warm .image-14, which nothing ever reveals", () => {
+      // ref css:2789 hides it and no reference JS chunk un-hides it. Warming it
+      // would spend a request on a picture that can never be seen.
+      const SRC = readFileSync(resolve(HERE, "index.svelte"), "utf8");
+      const block = SRC.slice(SRC.indexOf("const hiddenPlans"), SRC.indexOf("$effect("));
+      expect(block).not.toContain("29N_floor_plan_fpo");
+    });
+  });
 });

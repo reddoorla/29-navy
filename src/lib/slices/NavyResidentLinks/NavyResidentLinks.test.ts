@@ -773,4 +773,79 @@ describe("NavyResidentLinks slice", () => {
       ),
     ).toHaveLength(6);
   });
+
+  describe("the opening and closing tween", () => {
+    // The reference tweens all six popups over 500ms with THREE different
+    // easings — one for gym opening, one for the other five opening, and a
+    // third (empty, i.e. linear) for every close. An earlier version of this
+    // component read one IX2 action list and applied its easing everywhere.
+    const CSS_NO_COMMENTS = STYLE.replace(/\/\*[\s\S]*?\*\//g, "");
+
+    it("closes on a straight line, not the opening curve", () => {
+      // Measured against the live reference, gym closing, every 100ms:
+      // 0.7834 / 0.5834 / 0.3832 / 0.1686 / 0 — ~0.2 per 100ms, so the IX2
+      // easing of "" is linear rather than any default curve.
+      // anyRule, not ruleBody: the token block and the transition group BOTH
+      // end in `.food-modal---popup {`, so a first-match lookup reads the
+      // custom properties and never sees a transition at all.
+      expect(anyRule(".food-modal---popup")).toMatch(/transition:\s*opacity 500ms linear;/);
+    });
+
+    it("gives gym a different opening easing from the other five", () => {
+      // Not a slip to normalise: gym's open action carries easing "outQuad",
+      // the other five carry "inOutQuad". Reference opacity at 200ms is
+      // 0.63976 — easeOutQuad(0.4) = 0.4 * (2 - 0.4) = 0.64 exactly.
+      const gym = ruleBody(".popup-modal---gym[data-open]");
+      const others = ruleBody(".food-modal---popup[data-open]");
+      expect(gym).toMatch(/cubic-bezier\(\s*0\.25,\s*0\.46,\s*0\.45,\s*0\.94\s*\)/);
+      expect(others).toMatch(/cubic-bezier\(\s*0\.455,\s*0\.03,\s*0\.515,\s*0\.955\s*\)/);
+      expect(gym).not.toBe(others);
+    });
+
+    it("does not give gym the shared opening easing as well", () => {
+      // A grouped selector that happened to include gym would let the shared
+      // curve win by source order and the fix would be invisible.
+      const shared = CSS_NO_COMMENTS.match(/\n {2}([^{}]*\[data-open\][^{}]*)\{/g) ?? [];
+      const sharedOpen = shared.find((g) => g.includes("electric"));
+      expect(sharedOpen, "no shared [data-open] rule found").toBeTruthy();
+      expect(sharedOpen).not.toContain("popup-modal---gym[data-open]");
+    });
+
+    it("marks the opening popup, and only that one", async () => {
+      // data-open is what selects the OPEN easing, so if it never lands the
+      // close curve runs in both directions and the fix is inert.
+      const { container } = render(NavyResidentLinks, { props: { slice } });
+      expect(container.querySelectorAll("[data-open]")).toHaveLength(0);
+      (container.querySelector("a.link-block-4") as HTMLElement).click();
+      await tick();
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      await tick();
+      const open = [...container.querySelectorAll("[data-open]")];
+      expect(open).toHaveLength(1);
+      expect(refClasses(open[0])).toContain("popup-modal---gym");
+    });
+  });
+
+  describe("images behind the popups", () => {
+    it("warms every hidden popup image after load", () => {
+      // Thirteen images live inside `display: none` popups, so `loading="lazy"`
+      // defers each fetch until its popup opens and the logo lands visibly
+      // late. Measured on production before this: 2 of 12 hidden images were
+      // fetched before any interaction; after, 12 of 12.
+      expect(SOURCE).toContain("preloadHidden");
+      const list = SOURCE.slice(SOURCE.indexOf("const hiddenImages"), SOURCE.indexOf("$effect("));
+      for (const field of [
+        "laundry_logo",
+        "gym_logo_1",
+        "gym_logo_2",
+        "tv_logo",
+        "ride_logo_1",
+        "ride_logo_2",
+        "food_logo_1",
+        "food_logo_2",
+      ])
+        expect(list, `${field} is not warmed`).toContain(field);
+      expect(list).toContain("CLOSE_ICON");
+    });
+  });
 });
