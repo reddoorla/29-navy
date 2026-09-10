@@ -1,0 +1,226 @@
+{
+  "id": "navy_resident_links",
+  "type": "SharedSlice",
+  "name": "NavyResidentLinks",
+  "description": "Two columns of resident-service tiles, plus the six amenity popups they open",
+  "variations": [
+    {
+      "id": "default",
+      "name": "Default",
+      "docURL": "...",
+      "version": "initial",
+      "description": "Eight black tiles split across two columns; seven open a popup, one links out",
+      "imageUrl": "",
+      "primary": {
+        "heading": {
+          "type": "StructuredText",
+          "config": {
+            "label": "heading",
+            "single": "heading1"
+          }
+        },
+        "tiles": {
+          "type": "Group",
+          "config": {
+            "label": "tiles",
+            "fields": {
+              "label": {
+                "type": "Text",
+                "config": {
+                  "label": "label",
+                  "placeholder": "e.g. Paying rent online?"
+                }
+              },
+              "link": {
+                "type": "Link",
+                "config": {
+                  "label": "link",
+                  "allowTargetBlank": true
+                }
+              },
+              "modal": {
+                "type": "Select",
+                "config": {
+                  "label": "modal",
+                  "placeholder": "opens no popup",
+                  "options": ["electric", "laundry", "gym", "tv_internet", "ride", "food"]
+                }
+              }
+            }
+          }
+        },
+        "electric_title": {
+          "type": "Text",
+          "config": {
+            "label": "electric_title"
+          }
+        },
+        "electric_body": {
+          "type": "StructuredText",
+          "config": {
+            "label": "electric_body",
+            "multi": "paragraph"
+          }
+        },
+        "laundry_title": {
+          "type": "Text",
+          "config": {
+            "label": "laundry_title"
+          }
+        },
+        "laundry_logo": {
+          "type": "Image",
+          "config": {
+            "label": "laundry_logo",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "laundry_link": {
+          "type": "Link",
+          "config": {
+            "label": "laundry_link",
+            "allowTargetBlank": true
+          }
+        },
+        "gym_title": {
+          "type": "Text",
+          "config": {
+            "label": "gym_title"
+          }
+        },
+        "gym_logo_1": {
+          "type": "Image",
+          "config": {
+            "label": "gym_logo_1",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "gym_link_1": {
+          "type": "Link",
+          "config": {
+            "label": "gym_link_1",
+            "allowTargetBlank": true
+          }
+        },
+        "gym_logo_2": {
+          "type": "Image",
+          "config": {
+            "label": "gym_logo_2",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "gym_link_2": {
+          "type": "Link",
+          "config": {
+            "label": "gym_link_2",
+            "allowTargetBlank": true
+          }
+        },
+        "tv_title": {
+          "type": "Text",
+          "config": {
+            "label": "tv_title"
+          }
+        },
+        "tv_logo": {
+          "type": "Image",
+          "config": {
+            "label": "tv_logo",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "tv_link": {
+          "type": "Link",
+          "config": {
+            "label": "tv_link",
+            "allowTargetBlank": true
+          }
+        },
+        "tv_body": {
+          "type": "StructuredText",
+          "config": {
+            "label": "tv_body",
+            "multi": "paragraph"
+          }
+        },
+        "ride_title": {
+          "type": "Text",
+          "config": {
+            "label": "ride_title"
+          }
+        },
+        "ride_logo_1": {
+          "type": "Image",
+          "config": {
+            "label": "ride_logo_1",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "ride_link_1": {
+          "type": "Link",
+          "config": {
+            "label": "ride_link_1",
+            "allowTargetBlank": true
+          }
+        },
+        "ride_logo_2": {
+          "type": "Image",
+          "config": {
+            "label": "ride_logo_2",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "ride_link_2": {
+          "type": "Link",
+          "config": {
+            "label": "ride_link_2",
+            "allowTargetBlank": true
+          }
+        },
+        "food_title": {
+          "type": "Text",
+          "config": {
+            "label": "food_title"
+          }
+        },
+        "food_logo_1": {
+          "type": "Image",
+          "config": {
+            "label": "food_logo_1",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "food_link_1": {
+          "type": "Link",
+          "config": {
+            "label": "food_link_1",
+            "allowTargetBlank": true
+          }
+        },
+        "food_logo_2": {
+          "type": "Image",
+          "config": {
+            "label": "food_logo_2",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "food_link_2": {
+          "type": "Link",
+          "config": {
+            "label": "food_link_2",
+            "allowTargetBlank": true
+          }
+        }
+      },
+      "items": {}
+    }
+  ]
+}

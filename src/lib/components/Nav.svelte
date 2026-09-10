@@ -24,6 +24,15 @@
     logo?: { url: string; maxWidth?: string };
   }
 
+  // POSITION: STICKY, NOT FIXED. The reference's own bar is
+  // `position: sticky; top: 0` with `display: flex` — matching/spec/…shared…css:2154-2162
+  // — so it sits in NORMAL FLOW and the page's first section begins BELOW it.
+  // A `fixed` bar is out of flow and contributes zero height, which is not a
+  // styling difference but a structural one: measured at 1440, it put the hero
+  // at y=0 instead of y=68, shifted every anchor on the page up by ~68px, and
+  // left the harness with no `top` region at all. page-diff then saw 5 regions
+  // on the reference against 4 on the candidate and marked the whole run
+  // TRUNCATED — uncountable, so the page could not be scored at any viewport.
   let { navLinks = [], items = [], logo }: Props = $props();
 
   let isMenuOpen = $state(false);
@@ -47,7 +56,7 @@
 {#if useNavLinks}
   <!-- navLinks (per-route override) chrome: inline links on desktop,
        focus-trapped full-screen menu on mobile. -->
-  <nav class="fixed top-0 left-0 z-50 flex w-full items-center justify-between px-8 py-4">
+  <nav class="sticky top-0 left-0 z-50 flex w-full items-center justify-between px-8 py-4">
     <a href="/" class="text-lg font-bold">Logo</a>
 
     <div class="hidden items-center gap-8 lg:flex">
@@ -70,15 +79,14 @@
   </nav>
 {:else}
   <!-- site-config (#71) chrome: logo + dropdown nav. -->
-  <nav
-    class="fixed top-0 left-0 z-50 flex w-full items-center justify-between bg-background/95 px-8 py-4 backdrop-blur-sm"
-  >
-    <a href="/" class="flex items-center text-lg font-bold">
+  <nav class="navbar-ref sticky top-0 left-0 flex w-full items-center justify-center">
+    <a href="/" class="navbar-logo flex items-center text-lg font-bold">
       {#if logo}
         <img
           src={logo.url}
           alt="Home"
-          class="h-8 w-auto"
+          width="164"
+          class="navbar-logo-img"
           style={logo.maxWidth ? `max-width:${logo.maxWidth}` : undefined}
         />
       {:else}
@@ -92,7 +100,7 @@
            for pointer/keyboard-tab users. Keyed by index: nav labels/hrefs aren't
            unique (two "" heading hrefs or repeated labels would collide and Svelte
            throws each_key_duplicate at hydration). -->
-      <ul class="hidden items-center gap-8 lg:flex">
+      <ul class="nav-menu-ref hidden items-center lg:flex">
         {#each items as item, i (i)}
           {#if item.children && item.children.length > 0}
             <li class="group relative">
@@ -128,7 +136,16 @@
               </ul>
             </li>
           {:else if item.href}
-            <li><a href={item.href}>{item.label}</a></li>
+            <!-- The reference marks exactly two of its six links with `.button`
+                 — "Apply Now" (rentspree) and "Pay Rent" (gozego) — and both
+                 are the only two that leave the site. Keyed on that rather than
+                 on the label, so the rule is a property of the link, not of the
+                 copy. -->
+            <li>
+              <a href={item.href} class="nav-link-ref" class:nav-button={/^https?:/.test(item.href)}
+                >{item.label}</a
+              >
+            </li>
           {:else}
             <li><span>{item.label}</span></li>
           {/if}
@@ -228,3 +245,85 @@
     </div>
   {/if}
 {/if}
+
+<style>
+  /* The 29 Navy bar, transcribed from the reference stylesheet. Every rule
+     names the line it came from — matching/spec/29navy-8c2435.shared.46514381b.css.
+     `position: sticky` is load-bearing and is explained where it is set in the
+     script above: a `fixed` bar leaves normal flow, contributes no height, and
+     costs the harness its whole `top` region. */
+  .navbar-ref {
+    z-index: 13; /* ref css:2155 */
+    background-color: #000; /* ref css:2156 */
+    justify-content: center; /* ref css:2157 */
+    align-items: center; /* ref css:2158 */
+    display: flex; /* ref css:2159 */
+    position: sticky; /* ref css:2160 */
+    top: 0; /* ref css:2161 */
+  }
+
+  /* In the reference the logo is the LAST child of .navbar and is pulled to the
+     front by order:-1 (ref css:2127). Here it is already first, so the rule is
+     transcribed rather than relied on — it costs nothing and keeps the two
+     renders describable by the same line. */
+  .navbar-logo {
+    order: -1; /* ref css:2127 */
+    margin-left: 10px; /* ref css:2128 */
+    padding-top: 0; /* ref css:2129 */
+  }
+
+  /* Not a measured rect: the reference's own <img width="164">, and the file's
+     intrinsic 986x253, give 164 x 42.1 rendered. The bar's 68px height is
+     emergent from this plus the links' box — it is never set directly. */
+  .navbar-logo-img {
+    width: 164px;
+    height: auto;
+  }
+
+  /* ref css:2164-2168 — .container.w-container */
+  .nav-menu-ref {
+    justify-content: center; /* ref css:2165 */
+    margin-left: auto; /* ref css:2166 */
+    margin-right: auto; /* ref css:2167 */
+    display: flex; /* ref css:2168 */
+  }
+
+  /* .w-nav-link — Webflow's own base for every link in the bar, ref css:1823-1832.
+     This is where the navbar's 68px comes from, and it is why the height must
+     never be typed in as a number: 28px line-height + 20px padding top + 20px
+     bottom = 68. Measured before this rule landed, the bar was 42px — exactly
+     the logo alone — because the links were `display: inline` with no padding
+     and contributed no box at all. */
+  .nav-link-ref {
+    vertical-align: top; /* ref css:1824 */
+    text-align: left; /* ref css:1826 */
+    padding: 20px; /* ref css:1829 */
+    text-decoration: none; /* ref css:1830 */
+    display: inline-block; /* ref css:1831 */
+    position: relative; /* ref css:1832 */
+    color: #fff; /* ref css:2133 — .nav-link-2 overrides w-nav-link's #222 */
+    margin-bottom: 0; /* ref css:2440 */
+    margin-left: 20px; /* ref css:2441 */
+    margin-right: 20px; /* ref css:2442 */
+    font-size: 20px; /* ref css:2443 */
+    line-height: 1.4em; /* ref css:2444 */
+  }
+
+  /* .nav-link-2.text-block-11.button — ref css:2140-2147 */
+  .nav-link-ref.nav-button {
+    cursor: pointer; /* ref css:2141 */
+    border: 1px solid #aa4133; /* ref css:2142 */
+    margin-top: 10px; /* ref css:2143 */
+    padding: 10px; /* ref css:2144 */
+    line-height: 1.2em; /* ref css:2145 */
+    transition:
+      color 0.2s,
+      background-color 0.2s; /* ref css:2146 */
+  }
+
+  /* ref css:2149-2152 */
+  .nav-link-ref.nav-button:hover {
+    color: #000; /* ref css:2150 — var(--black) */
+    background-color: #fff; /* ref css:2151 */
+  }
+</style>

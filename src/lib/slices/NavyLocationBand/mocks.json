@@ -1,0 +1,43 @@
+[
+  {
+    "__TYPE__": "SharedSliceContent",
+    "variation": "default",
+    "primary": {
+      "heading": {
+        "__TYPE__": "StructuredTextContent",
+        "value": [
+          {
+            "type": "heading1",
+            "content": {
+              "text": "Location"
+            }
+          }
+        ]
+      },
+      "background_image": {
+        "url": "/29navy/assets/614ddffddb6b8587d3d41004_location-aerial.jpg",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614ddffddb6b8587d3d41004_location-aerial.jpg",
+          "width": 1600,
+          "height": 861
+        },
+        "width": 1600,
+        "height": 861,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Aerial photograph looking down on the 29 Navy building and the surrounding Santa Monica blocks, with the beach and the Pacific beyond.",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      }
+    },
+    "items": []
+  }
+]

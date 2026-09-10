@@ -85,3 +85,29 @@ was read out of the captured HTML in `matching/spec/index.html`, not inferred.
   score from this gate until reddoorla/reddoor-maintenance#744 lands.** Both
   files are recipe-owned, so the fix is made in `beachfront-dentistry` and
   regenerated.
+- **The gate renders the reference WITH JavaScript, so the slider dot-nav is
+  real and the rebuild server-renders six dots.** Raised as an open question by
+  the hero build: `.slide-nav` is EMPTY in the captured static HTML
+  (`matching/spec/index.html`), and Webflow's slider JS builds six
+  `.w-slider-dot` children into it at runtime. Whether to reproduce them turns
+  entirely on whether the gate runs scripts — six extra circles if not.
+  **Settled from the tool, not from taste:** the matching-a-page skill's
+  `lib/capture.mjs:39-45` creates its browser context with only `viewport`,
+  `deviceScaleFactor` and `reducedMotion`; `javaScriptEnabled` is never set, so
+  Playwright's default `true` stands, and it then waits for `load` plus a settle
+  timeout. The reference the gate photographs therefore HAS six 14×14 dots in a
+  40px strip (css:1222, :1257-1266) — so the candidate must too. Server-rendering
+  them also satisfies the repo's no-JS rule, which a JS-built nav would not.
+  Note for later: the same context sets `reducedMotion: "reduce"`, which is the
+  trap CLAUDE.md records under "check what the shared harness forces" — any
+  Phase 5 assertion about slider motion must account for it rather than assume
+  animations run.
+- Deviation, deliberate: the contact block's phone and email links are
+  CORRECTED, not reproduced. The reference ships `href="https://(310) 393-9653"`
+  — a malformed URL, and a number that disagrees with the `(310) 393-9657` it
+  displays — plus a mailto carrying a stray zero-width character. The rebuild
+  emits a well-formed `tel:` and a clean `mailto:`. Reproducing a broken link
+  to match a reference is not fidelity, and neither is measurable by the gate.
+- Deviation, pre-declared as artifact class 4: the reference ships `alt=""` on
+  all 23 images; the rebuild authors real alt text. One residual `text-diff` row
+  per image, in the candidate direction, is expected and is not a defect.

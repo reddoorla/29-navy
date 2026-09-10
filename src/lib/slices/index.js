@@ -5,6 +5,11 @@ import CtaBanner from "./CtaBanner/index.svelte";
 import Hero from "./Hero/index.svelte";
 import LeadText from "./LeadText/index.svelte";
 import MediaText from "./MediaText/index.svelte";
+import NavyContact from "./NavyContact/index.svelte";
+import NavyFloorPlans from "./NavyFloorPlans/index.svelte";
+import NavyHeroSlider from "./NavyHeroSlider/index.svelte";
+import NavyLocationBand from "./NavyLocationBand/index.svelte";
+import NavyResidentLinks from "./NavyResidentLinks/index.svelte";
 import RichText from "./RichText/index.svelte";
 import SectionGrid from "./SectionGrid/index.svelte";
 import Testimonial from "./Testimonial/index.svelte";
@@ -16,6 +21,11 @@ export const components = {
   hero: Hero,
   lead_text: LeadText,
   media_text: MediaText,
+  navy_contact: NavyContact,
+  navy_floor_plans: NavyFloorPlans,
+  navy_hero_slider: NavyHeroSlider,
+  navy_location_band: NavyLocationBand,
+  navy_resident_links: NavyResidentLinks,
   rich_text: RichText,
   section_grid: SectionGrid,
   testimonial: Testimonial,

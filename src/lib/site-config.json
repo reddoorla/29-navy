@@ -1,4 +1,20 @@
 {
-  "nav": { "items": [] },
+  "nav": {
+    "items": [
+      { "label": "Location", "href": "#Location" },
+      { "label": "Lofts", "href": "#Lofts" },
+      { "label": "Residents", "href": "#Residents" },
+      { "label": "Contact", "href": "#contact" },
+      {
+        "label": "Apply Now",
+        "href": "https://www.rentspree.com/apply/615b8194b7272a0016c60303/landing/apply-now?utm_source=rentspree&utm_medium=leaselink"
+      },
+      { "label": "Pay Rent", "href": "https://payments.gozego.com/login/" }
+    ],
+    "logo": {
+      "url": "/29navy/assets/614ddfd99cfded33c79307a5_29_navy_logo_white_black_fpo.jpg",
+      "maxWidth": "164px"
+    }
+  },
   "footer": { "socials": [] }
 }

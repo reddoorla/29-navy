@@ -1,0 +1,262 @@
+[
+  {
+    "__TYPE__": "SharedSliceContent",
+    "variation": "default",
+    "primary": {
+      "logo": {
+        "url": "/29navy/assets/68a8b03886756d39d580f327_29-navy-logo-black.jpg",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/68a8b03886756d39d580f327_29-navy-logo-black.jpg",
+          "width": 776,
+          "height": 800
+        },
+        "width": 776,
+        "height": 800,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "29 Navy",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      },
+      "tagline_line_1": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "Creative Lofts"
+      },
+      "tagline_line_2": {
+        "__TYPE__": "FieldContent",
+        "type": "Text",
+        "value": "for Lease"
+      },
+      "slides": {
+        "__TYPE__": "GroupContentType",
+        "value": [
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "0f8b2c41-5d7e-4a19-9c30-2b6ad4e51f07",
+            "value": [
+              [
+                "image",
+                {
+                  "url": "/29navy/assets/614de02ec8febc5e1427ffc8_gallery_roof1.jpg",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/614de02ec8febc5e1427ffc8_gallery_roof1.jpg",
+                    "width": 1400,
+                    "height": 898
+                  },
+                  "width": 1400,
+                  "height": 898,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "The roof deck at 29 Navy, looking out over the neighbouring rooftops toward the ocean.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "1a4d6e92-8c05-4f3b-b71e-5d0c9a2f4816",
+            "value": [
+              [
+                "image",
+                {
+                  "url": "/29navy/assets/614de02ec8febc767427ffcd_gallery_colvu2.jpg",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/614de02ec8febc767427ffcd_gallery_colvu2.jpg",
+                    "width": 1409,
+                    "height": 901
+                  },
+                  "width": 1409,
+                  "height": 901,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "A loft interior with exposed structural columns and full-height windows along one wall.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "2c7f1b38-4e6a-49d5-8302-7fa1c6b0e924",
+            "value": [
+              [
+                "image",
+                {
+                  "url": "/29navy/assets/614de02ec8febc401227ffd2_gallery_colvu1.jpg",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/614de02ec8febc401227ffd2_gallery_colvu1.jpg",
+                    "width": 1404,
+                    "height": 901
+                  },
+                  "width": 1404,
+                  "height": 901,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "An open loft floor, its concrete columns marching back toward a bank of windows.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "3e9a5c07-6b21-4d84-97ac-1f3b8d20e657",
+            "value": [
+              [
+                "image",
+                {
+                  "url": "/29navy/assets/614ddfc369005a542460176f_hero-main-final.jpg",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/614ddfc369005a542460176f_hero-main-final.jpg",
+                    "width": 1600,
+                    "height": 1068
+                  },
+                  "width": 1600,
+                  "height": 1068,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "The 29 Navy building seen from the street, its brick facade lit by late afternoon sun.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "4b2c8f60-9d13-4e57-a6f8-0c47e5a91b32",
+            "value": [
+              [
+                "image",
+                {
+                  "url": "/29navy/assets/614de02ec8febcca7527ffb4_gallery_29navy_interior.jpg",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/614de02ec8febcca7527ffb4_gallery_29navy_interior.jpg",
+                    "width": 1600,
+                    "height": 861
+                  },
+                  "width": 1600,
+                  "height": 861,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "A furnished loft interior with polished concrete floors and a high open ceiling.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ]
+            ]
+          },
+          {
+            "__TYPE__": "GroupItemContent",
+            "key": "5d6e0a94-2f78-4b3c-85d1-9e07c4f2a680",
+            "value": [
+              [
+                "image",
+                {
+                  "url": "/29navy/assets/614de02ec8febce2c327ffc3_gallery_13A9553p.jpg",
+                  "origin": {
+                    "id": "main",
+                    "url": "/29navy/assets/614de02ec8febce2c327ffc3_gallery_13A9553p.jpg",
+                    "width": 1600,
+                    "height": 861
+                  },
+                  "width": 1600,
+                  "height": 861,
+                  "edit": {
+                    "background": "transparent",
+                    "zoom": 1,
+                    "crop": {
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  "alt": "A corner workspace at 29 Navy, daylight falling across the floor from two window walls.",
+                  "credits": null,
+                  "__TYPE__": "ImageContent",
+                  "thumbnails": {}
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "mobile_location_image": {
+        "url": "/29navy/assets/614ddffddb6b8587d3d41004_location-aerial.jpg",
+        "origin": {
+          "id": "main",
+          "url": "/29navy/assets/614ddffddb6b8587d3d41004_location-aerial.jpg",
+          "width": 1600,
+          "height": 861
+        },
+        "width": 1600,
+        "height": 861,
+        "edit": {
+          "background": "transparent",
+          "zoom": 1,
+          "crop": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "alt": "Aerial photograph looking down on the 29 Navy building and the surrounding blocks, with the beach and the Pacific beyond.",
+        "credits": null,
+        "__TYPE__": "ImageContent",
+        "thumbnails": {}
+      }
+    },
+    "items": []
+  }
+]

@@ -1,0 +1,65 @@
+{
+  "id": "navy_hero_slider",
+  "type": "SharedSlice",
+  "name": "NavyHeroSlider",
+  "description": "Full-viewport photo slider with the overlaid mark and lease tagline, plus the mobile-only aerial",
+  "variations": [
+    {
+      "id": "default",
+      "name": "Default",
+      "docURL": "...",
+      "version": "initial",
+      "description": "Six-photo gallery standing 100vh (50vh below 768), a right-offset logo block, and a separate aerial shown only at 767 and under",
+      "imageUrl": "",
+      "primary": {
+        "logo": {
+          "type": "Image",
+          "config": {
+            "label": "logo",
+            "constraint": {},
+            "thumbnails": []
+          }
+        },
+        "tagline_line_1": {
+          "type": "Text",
+          "config": {
+            "label": "tagline_line_1",
+            "placeholder": "e.g. Creative Lofts"
+          }
+        },
+        "tagline_line_2": {
+          "type": "Text",
+          "config": {
+            "label": "tagline_line_2",
+            "placeholder": "e.g. for Lease"
+          }
+        },
+        "slides": {
+          "type": "Group",
+          "config": {
+            "label": "slides",
+            "fields": {
+              "image": {
+                "type": "Image",
+                "config": {
+                  "label": "image",
+                  "constraint": {},
+                  "thumbnails": []
+                }
+              }
+            }
+          }
+        },
+        "mobile_location_image": {
+          "type": "Image",
+          "config": {
+            "label": "mobile_location_image",
+            "constraint": {},
+            "thumbnails": []
+          }
+        }
+      },
+      "items": {}
+    }
+  ]
+}

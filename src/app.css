@@ -13,20 +13,26 @@
   --color-white: white;
   --color-background: white;
 
-  /* Neutral placeholder palette — replace per project (docs/STARTER.md). Every
-     value is distinct on purpose so a forgotten token is visible, not silent. */
+  /* 29 Navy brand palette, transcribed from the reference stylesheet's own
+     custom properties — matching/spec/29navy-8c2435.shared.46514381b.css:2073-2078.
+     `firebrick` is the Lofts band's ground and the nav button's border; it is
+     the only chromatic colour on the page. */
+  --color-firebrick: #aa4133; /* ref css:2075 */
+  --color-white-2: #ffffff78; /* ref css:2077 */
   --color-light: #e5e7eb;
-  --color-primary: #111827;
+  --color-primary: #333; /* ref css:223 — body colour */
   --color-dark: #1f2937;
   --color-secondary: #6b7280;
-  --color-accent: #2563eb;
+  --color-accent: #aa4133; /* ref css:2075 */
 
-  /* Type — set per project. Self-host the brand's licensed woff2 files under
-     static/fonts (preload the body face in app.html) or load a kit, then
-     point these at the loaded family names. Until then the system stack
-     applies. `font-heading` / `font-body` utilities come from these tokens. */
-  --font-heading: ui-sans-serif, system-ui, sans-serif;
-  --font-body: ui-sans-serif, system-ui, sans-serif;
+  /* Type. The reference ships NO text webfont — its only @font-face rules are
+     webflow-icons and three Font Awesome faces (css:172, 2050, 2058, 2066), so
+     every word on the page is set in the stack below, straight from the
+     reference's own body rule at css:227. Do not "upgrade" this to a brand
+     face: text metrics ARE the height ladder here, and Arial's are what the
+     reference's 100vh sections were laid out against. */
+  --font-heading: Arial, sans-serif; /* ref css:227 */
+  --font-body: Arial, sans-serif; /* ref css:227 */
 
   --transition-in-expo: cubic-bezier(0.95, 0.05, 0.795, 0.035);
   --transition-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
@@ -209,8 +215,17 @@ main > section.hero-band:first-child {
     scrollbar-gutter: stable;
   }
 
+  /* The root type ladder, transcribed from the reference — css:222-230.
+     SPEC.md names this as a trap worth paying up front: a reference's root-font
+     ladder gets discovered reactively, after a region has already failed several
+     geometry rounds, because every descendant that inherits a size is wrong by
+     the same ratio and each one reads as its own bug. 14px/20px is not a
+     Tailwind default and will not arrive by accident. */
   body {
-    font-family: var(--font-body);
+    font-family: var(--font-body); /* ref css:227 */
+    font-size: 14px; /* ref css:228 */
+    line-height: 20px; /* ref css:229 */
+    color: var(--color-primary); /* ref css:223 — #333 */
     max-width: 100vw;
     overflow-x: clip;
     overflow-y: auto;

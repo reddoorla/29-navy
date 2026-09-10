@@ -1,6 +1,6 @@
 # Reference capture — https://www.29navy.com/
 
-Captured 2026-09-10T00:07:04.433Z by `matching/capture-reference.mjs`.
+Captured 2026-09-10T19:16:36.177Z by `matching/capture-reference.mjs`.
 The bytes live in git-ignored `matching/spec/`; this manifest is tracked so a
 fresh clone can tell whether its capture is the same one SPEC.md was written from.
 
@@ -40,6 +40,9 @@ fresh clone can tell whether its capture is the same one SPEC.md was written fro
 | `matching/spec/assets/614e0828dc5ca9db01c4b415_logo-modal-uber-eats-p-500.png`                                | htmlAssets           | 8053    | 200    | `f619868bd4099dac` |
 | `matching/spec/assets/614e0828dc5ca9db01c4b415_logo-modal-uber-eats.png`                                      | htmlAssets           | 11276   | 200    | `605ae122191c7f70` |
 | `matching/spec/assets/614e083adb033884c9babd48_logo-modal-postmates.png`                                      | htmlAssets           | 16050   | 200    | `2a280ec48a071a04` |
+| `matching/spec/assets/615330625afda8f3e747c53f_Untitled design (16).png`                                      | cssPhotos            | 9871    | 200    | `0697bcf6201c0a3c` |
+| `matching/spec/assets/6153308fcb691617e9de8587_Untitled design (17).png`                                      | cssPhotos            | 10418   | 200    | `8718946b0690e65d` |
+| `matching/spec/assets/615330c04bb71e65b9ff085c_Untitled design (18).png`                                      | cssPhotos            | 8689    | 200    | `f94dddee09c9ef45` |
 | `matching/spec/assets/66734453c258a15e340f4029_favicon-32x32.png`                                             | icons                | 1102    | 200    | `dea2327ae0d28307` |
 | `matching/spec/assets/66f5902c770ab3b836eb01f2_Artboard 1.png`                                                | icons                | 8536    | 200    | `85b51ec4ed712965` |
 | `matching/spec/assets/68a8a9f0547387a3619409d7_floorplan-level-1_label-p-1080.png`                            | htmlAssets           | 48048   | 200    | `9d603d2b92b3261f` |
@@ -97,7 +100,7 @@ fresh clone can tell whether its capture is the same one SPEC.md was written fro
 | `matching/spec/js/29navy-8c2435.schunk.36b8fb49256177c8.js`                                                   | scripts              | 41429   | 200    | `8b7d0de9f3df9103` |
 | `matching/spec/js/jquery-3.5.1.min.dc5e7f18c8.js`                                                             | scripts              | 89476   | 200    | `f7f6a5894f1d19dd` |
 
-Total 90 files, 13667608 bytes.
+Total 93 files, 13696586 bytes.
 
 | group      | found | expected |
 | ---------- | ----- | -------- |
@@ -108,6 +111,6 @@ Total 90 files, 13667608 bytes.
 | htmlAssets | 58    | 58       |
 | fonts      | 12    | 12       |
 | fontSvg    | 3     | 3        |
-| cssPhotos  | 10    | 10       |
+| cssPhotos  | 13    | 13       |
 | cssOther   | 1     | 1        |
-| files      | 90    | 90       |
+| files      | 93    | 93       |

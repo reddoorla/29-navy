@@ -1,0 +1,77 @@
+{
+  "id": "navy_contact",
+  "type": "SharedSlice",
+  "name": "NavyContact",
+  "description": "Black contact panel beside a full-bleed photo",
+  "variations": [
+    {
+      "id": "default",
+      "name": "Default",
+      "docURL": "...",
+      "version": "initial",
+      "description": "Address and contact links on a black panel, with a full-bleed photograph beside it",
+      "imageUrl": "",
+      "primary": {
+        "heading": {
+          "type": "StructuredText",
+          "config": {
+            "label": "heading",
+            "single": "heading1"
+          }
+        },
+        "address_line_1": {
+          "type": "Text",
+          "config": {
+            "label": "address_line_1",
+            "placeholder": "e.g. 29 Navy Street"
+          }
+        },
+        "address_line_2": {
+          "type": "Text",
+          "config": {
+            "label": "address_line_2",
+            "placeholder": "e.g. Venice, California 90291"
+          }
+        },
+        "links": {
+          "type": "Group",
+          "config": {
+            "label": "links",
+            "fields": {
+              "label": {
+                "type": "Text",
+                "config": {
+                  "label": "label",
+                  "placeholder": "e.g. Call us:"
+                }
+              },
+              "value": {
+                "type": "Text",
+                "config": {
+                  "label": "value",
+                  "placeholder": "e.g. (310) 393-9657"
+                }
+              },
+              "target": {
+                "type": "Link",
+                "config": {
+                  "label": "target",
+                  "allowTargetBlank": true
+                }
+              }
+            }
+          }
+        },
+        "photo": {
+          "type": "Image",
+          "config": {
+            "label": "photo",
+            "constraint": {},
+            "thumbnails": []
+          }
+        }
+      },
+      "items": {}
+    }
+  ]
+}
