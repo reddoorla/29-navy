@@ -1123,3 +1123,79 @@ path is what you need when staging succeeded and publishing did not, and
 re-running `--apply` would have uploaded all 24 assets a second time.
 
 `pnpm verify`: **55 files, 472 tests, 4 smoke, exit 0.**
+
+## 2026-09-10 — The modal fade was the wrong curve, and 12 images waited for a click
+
+Two defects reported off the live site, both invisible to every check the repo
+had.
+
+**The backdrop.** The CSS transcription was correct — `.popup-modal---electric`
+is `#000000a1`, the other five are opaque `var(--black)`, and all six geometries
+match the reference to the pixel (backdrop 1440×900 @0,0, card 600×300 @420,300,
+logo 41×41 @969,310, measured on both live sites). What did not match was the
+_curve_. The reference tweens all six with IX2, duration 500, delay 0, and
+**three different easings**:
+
+|                            | reference   | this repo, before |
+| -------------------------- | ----------- | ----------------- |
+| open, `.popup-modal---gym` | `outQuad`   | `inOutQuad`       |
+| open, the other five       | `inOutQuad` | `inOutQuad`       |
+| close, all six             | `""`        | `inOutQuad`       |
+
+The old comment said _"IX2 actionList 'a' group 3 tweens opacity 0 -> 1 over
+duration 500 with easing 'inOutQuad'"_ — one action list, read correctly, and
+generalised to twelve. Enumerating the class was the whole job and it was the
+step that got skipped.
+
+Measured rather than inferred, gym opening at 1440: reference opacity
+**0.63976** at 200ms, which is easeOutQuad exactly — `0.4 × (2 − 0.4) = 0.64`.
+This repo produced **0.334882** there, an easeInOutQuad value. Closing, sampled
+every 100ms: reference **0.7834 / 0.5834 / 0.3832 / 0.1686 / 0** — a straight
+line, so IX2's empty easing is LINEAR, not some default curve. After the fix,
+against a production build: open **0.399 / 0.704 / 0.865 / 0.961** against the
+reference's 0.437 / 0.714 / 0.898 / 0.993, and close 0.785 / 0.567 / 0.350 /
+0.135 against 0.782 / 0.582 / 0.382 / 0.166. The 200ms gap went from 0.305 to
+0.010; the residual is about one frame, since `shown` flips on rAF.
+
+The two directions now differ, which needs a hook: `data-open` is set in the
+same frame as the opacity so the timing function is already in effect when the
+transition starts.
+
+**The pop-in.** `loading="lazy"` on an image inside `display: none` is never
+"near the viewport", so the browser defers it until the container is shown and
+the user watches it arrive. Measured on production: **2 of 12** hidden images
+had been fetched before any interaction — the close icon and the one floor plan
+that is `open_by_default`, both of which are visible. The other ten waited for a
+click or a hover.
+
+The reported instance was the residents modals; the class is larger. Three of
+the four floor plans are hidden at rest too, and each is a 2402×1392 PNG, so
+hovering a floor started a fetch for the picture the hover exists to show.
+`$utils/preloadHidden` warms both sets after `load` and inside
+`requestIdleCallback` — deliberately not on mount, because these are by
+construction not needed for first paint and fetching them early would compete
+with the hero slides for connections on exactly the slow links where that
+matters. After: **12 of 12**, resources 34 → 46.
+
+Two details that are not decoration. The util takes `{src, srcset, sizes}`, not
+a bare URL, because the floor plans render under `sizes="100vw"` over a
+five-candidate ladder — warming `src` alone caches the 2402w original and the
+browser then requests the 1600w candidate anyway, which is two fetches and the
+pop-in intact. And srcset/sizes are assigned _before_ src, because the candidate
+is resolved at the moment src is set; a test asserts the assignment order rather
+than the final values, since the final values are identical either way.
+`.image-14` is deliberately excluded: ref css:2789 hides it and no reference JS
+chunk un-hides it, so warming it would spend a request on something unreachable.
+
+**Why nothing caught either.** The axe gate cannot see a fade curve or a
+deferred fetch. The geometry gate measures a settled still frame, so a 500ms
+tween of any shape is identical to it once settled, and it never opens a modal
+at all. Both defects live in the gap between "the markup is right" and "the page
+behaves like the reference" — which is Phase 5's territory, and this is the
+first evidence of how much is in it.
+
+Guards broken on purpose: gym's own rule disabled (the exact original bug — the
+test names it), the close transition set back to the opening curve, the srcset
+dropped from the floor-plan warm-up. All three red, restored green.
+
+`pnpm verify`: **56 files, 486 tests, 4 smoke, exit 0.**

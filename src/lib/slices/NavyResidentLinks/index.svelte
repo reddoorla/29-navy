@@ -2,6 +2,8 @@
   import { asLink, type ImageField, type LinkField, type RichTextField } from "@prismicio/client";
   import { PrismicText } from "@prismicio/svelte";
 
+  import { preloadHidden } from "$utils/preloadHidden";
+
   /** The six popups this section can open. Keyed exactly as model.json's
    *  `modal` Select options. SEVEN triggers map onto SIX popups: the reference's
    *  `.link-block-5` ("Connecting cable tv?") and `.link-block-6` ("Plugging in
@@ -174,6 +176,31 @@
    *  nothing gates on them. */
   const popupStyle = (key: ModalKey) =>
     openKey === key ? `display:block;opacity:${shown ? 1 : 0}` : "display:none;opacity:0";
+
+  /** Marks the popup that is tweening TOWARDS opacity 1, so the stylesheet can
+   *  give the two directions different easings — which the reference does. Set
+   *  in the same frame as the opacity change, so the timing function is already
+   *  in effect when the transition starts. */
+  const openAttr = (key: ModalKey) => (openKey === key && shown ? "" : undefined);
+
+  /* All thirteen images behind the six popups, plus the close icon they share.
+     Every one of them sits inside a `display: none` container at rest, so
+     `loading="lazy"` defers the fetch until the popup opens and the logo
+     arrives visibly late — the modal animates in over a blank space. Warming
+     them after `load` costs first paint nothing; see $utils/preloadHidden. */
+  const hiddenImages = $derived([
+    CLOSE_ICON,
+    slice.primary.laundry_logo?.url,
+    slice.primary.gym_logo_1?.url,
+    slice.primary.gym_logo_2?.url,
+    slice.primary.tv_logo?.url,
+    slice.primary.ride_logo_1?.url,
+    slice.primary.ride_logo_2?.url,
+    slice.primary.food_logo_1?.url,
+    slice.primary.food_logo_2?.url,
+  ]);
+
+  $effect(() => preloadHidden(hiddenImages));
 </script>
 
 <svelte:window onkeydown={onWindowKey} />
@@ -194,7 +221,7 @@
      :3486). Six containers, six rule sets.                                   -->
 <!-- ===================================================================== -->
 
-<div class="popup-modal---electric" style={popupStyle("electric")}>
+<div class="popup-modal---electric" data-open={openAttr("electric")} style={popupStyle("electric")}>
   <div
     class="div-block-15"
     role="dialog"
@@ -220,7 +247,7 @@
   </div>
 </div>
 
-<div class="popup-modal---laundry" style={popupStyle("laundry")}>
+<div class="popup-modal---laundry" data-open={openAttr("laundry")} style={popupStyle("laundry")}>
   <div
     class="div-block-17"
     role="dialog"
@@ -257,7 +284,7 @@
   </div>
 </div>
 
-<div class="popup-modal---gym" style={popupStyle("gym")}>
+<div class="popup-modal---gym" data-open={openAttr("gym")} style={popupStyle("gym")}>
   <div
     class="div-block-19"
     role="dialog"
@@ -307,7 +334,11 @@
   </div>
 </div>
 
-<div class="pop-up-modal---tv-internet" style={popupStyle("tv_internet")}>
+<div
+  class="pop-up-modal---tv-internet"
+  data-open={openAttr("tv_internet")}
+  style={popupStyle("tv_internet")}
+>
   <div
     class="div-block-22"
     role="dialog"
@@ -344,7 +375,7 @@
   </div>
 </div>
 
-<div class="ride---modal" style={popupStyle("ride")}>
+<div class="ride---modal" data-open={openAttr("ride")} style={popupStyle("ride")}>
   <div
     class="div-block-24"
     role="dialog"
@@ -397,7 +428,7 @@
   </div>
 </div>
 
-<div class="food-modal---popup" style={popupStyle("food")}>
+<div class="food-modal---popup" data-open={openAttr("food")} style={popupStyle("food")}>
   <div
     class="div-block-27"
     role="dialog"
@@ -1000,19 +1031,57 @@
 
   /* ---- The opening and closing tween ------------------------------------- */
 
-  /* Not a stylesheet rule: IX2 actionList "a" group 3 tweens opacity 0 -> 1
-     over duration 500 with easing "inOutQuad", and "a-2" reverses it — read out
-     of matching/spec/js/29navy-8c2435.b450607e.3cb35528df4a8f16.js at the `a:{id:"a"`
-     and `"a-2":{id:"a-2"` action lists. The cubic-bezier below is
-     easeInOutQuad. `display` is switched by the inline style, one frame ahead,
-     because `display` is not animatable. */
+  /* Not a stylesheet rule: the six popups are tweened by IX2, read out of
+     matching/spec/js/29navy-8c2435.b450607e.3cb35528df4a8f16.js. All twelve
+     STYLE_OPACITY actions run duration 500, delay 0. The EASINGS are not
+     uniform, and an earlier version of this block read one action list and
+     applied its easing to all six in both directions:
+
+         open   .popup-modal---gym            outQuad
+         open   the other five                inOutQuad
+         close  all six                       "" (empty)
+
+     Measured against the live reference at 1440 to confirm the reading, gym
+     opening: reference opacity 0.63976 at 200ms, which is easeOutQuad exactly
+     (0.4 * (2 - 0.4) = 0.64); this block used to produce 0.334882 there.
+     Closing, sampled every 100ms: reference 0.7834 / 0.5834 / 0.3832 / 0.1686 /
+     0 — a straight line, so the empty easing is LINEAR, not the default.
+
+     `display` is switched by the inline style one frame ahead, because
+     `display` is not animatable. `data-open` marks the opening direction and is
+     set in the same frame as the opacity, so the timing function is in effect
+     before the transition starts. */
   .popup-modal---electric,
   .popup-modal---laundry,
   .popup-modal---gym,
   .pop-up-modal---tv-internet,
   .ride---modal,
   .food-modal---popup {
-    transition: opacity 500ms cubic-bezier(0.455, 0.03, 0.515, 0.955); /* ref js:a-n-4 duration 500, easing inOutQuad */
+    transition: opacity 500ms linear; /* ref js: close easing "" — measured linear */
+  }
+
+  .popup-modal---electric[data-open],
+  .popup-modal---laundry[data-open],
+  .pop-up-modal---tv-internet[data-open],
+  .ride---modal[data-open],
+  .food-modal---popup[data-open] {
+    transition-timing-function: cubic-bezier(
+      0.455,
+      0.03,
+      0.515,
+      0.955
+    ); /* easeInOutQuad — ref js open easing "inOutQuad" */
+  }
+
+  /* Gym alone. Not a slip in the reference to be normalised away: its open
+     action carries easing "outQuad" where the other five carry "inOutQuad". */
+  .popup-modal---gym[data-open] {
+    transition-timing-function: cubic-bezier(
+      0.25,
+      0.46,
+      0.45,
+      0.94
+    ); /* easeOutQuad — ref js open easing "outQuad" */
   }
 
   /* Not in the reference either way — the reference has no reduced-motion

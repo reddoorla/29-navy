@@ -2,6 +2,7 @@
   import { asLinkAttrs, isFilled } from "@prismicio/client";
   import type { BooleanField, ImageField, KeyTextField, LinkField } from "@prismicio/client";
   import { srcset as prismicSrcset } from "$lib/utils/image";
+  import { preloadHidden } from "$utils/preloadHidden";
 
   // Mirrors model.json. Slice Machine's generated `Content.NavyFloorPlansSlice`
   // supersedes this once the slice is registered and src/prismicio-types.d.ts is
@@ -168,6 +169,24 @@
       select(i);
     }
   }
+
+  /* Three of the four floor plans are hidden at rest — only the
+     `open_by_default` one is shown — and each is a 2402×1392 PNG. Hovering a
+     floor therefore starts the fetch and the plan arrives after the swap, which
+     is the whole interaction the section exists for. Warmed after `load`, with
+     the srcset so the browser resolves the SAME candidate the <img> will (see
+     $utils/preloadHidden); the already-visible plan is a cache hit and costs
+     nothing. `.image-14` is deliberately absent — ref css:2789 hides it and
+     nothing in any reference JS chunk ever un-hides it. */
+  const hiddenPlans = $derived(
+    floors.map((floor) => ({
+      src: floor.floorplan?.url,
+      srcset: planSrcset(floor.floorplan),
+      sizes: "100vw",
+    })),
+  );
+
+  $effect(() => preloadHidden(hiddenPlans));
 </script>
 
 <!--
