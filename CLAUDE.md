@@ -275,3 +275,5 @@ operator's call.
 5. Append to `matching/LEDGER.md` at the moment a deviation, floor or mask is
    decided, not reconstructed at the end.
 6. `pnpm verify`, then commit and push.
+
+<!-- end reddoor-maint match-harness -->

@@ -56,3 +56,5 @@ matching/*.json
 # one thing a fresh clone cannot reconstruct.
 !matching/harness.json
 matching/*.png
+
+# end reddoor-maint match-harness
