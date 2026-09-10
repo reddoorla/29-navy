@@ -833,3 +833,87 @@ the geometry gate measures and what Phase 5 will have to build. `next.mjs`
 instructs the operator to run `matching/probe-anchor-parity.mjs`, which the
 recipe does not install (reddoorla/reddoor-maintenance#732; the class is now
 bounded at exactly one dangling reference of thirteen).
+
+## 2026-09-10 — The empty page had two causes, and only one of them was known (#12)
+
+CI was red on PR #12 and `/` on the deploy preview served the navbar over
+nothing. Three symptoms were reported together — red CI, no content, no favicon
+— and they turned out to be three unrelated defects that happened to be visible
+at the same time.
+
+**CI: a test that could only run on the machine that captured the reference.**
+`NavyContact.test.ts` read `matching/spec/index.html` at module scope to derive
+its expectations from the real markup rather than retyping them. The reasoning
+was sound and is still the reasoning; the file is gitignored. `matching/*` is
+ignored on purpose — the capture is a workspace, not a record — so it exists on
+every machine that has run the harness and on no CI runner. A module-scope read
+throws ENOENT during **collection**, which takes the whole file down: CI
+reported `1 failed | 50 passed` and `422 passed` against 445 locally, so **23
+assertions about the contact band silently stopped running** and the failure
+named a missing file instead of anything about contact. This is the shape the
+six rules warn about from the other side: not a check that passed without
+evidence, but a check that vanished without saying so.
+
+Fixed by generating `src/lib/slices/NavyContact/reference.html` — 3885 bytes,
+two verbatim excerpts (navbar 940, contact 1941) — and tracking it. The
+derivation rules are content-addressed, not offset-addressed (`<div
+data-animation="default"` to the next `</div></div></div>`; `<div id="contact"
+class="section-7">` to the next `<script`), and they exist twice on purpose: in
+the generator and in the test, where `agrees with the live capture, wherever the
+live capture exists` re-runs them against `matching/spec/index.html` whenever
+that capture IS present and asserts byte equality. So the fixture cannot drift
+from the reference on any machine that could notice, and CI still runs every
+assertion. Proof rather than inference: with the capture moved out of the tree,
+**29 tests pass** — the 24 contact tests plus the 5 new repo-level ones.
+
+**Belief corrected on contact.** The previous entry's "what is NOT done" said
+`/` renders empty because the home document is not seeded, and treated that as
+the whole story. It was not. `customtypes/page/index.json` — the `page` type's
+slice zone, which is the list Prismic actually enforces — carried the nine
+template slices and **none of the five `navy_*` ones**. Seeding would have
+returned HTTP 200 and published a document with zero slices, and the page would
+have stayed exactly as empty, with the seed looking like it worked. The
+Migration API's silent drop is called out at the top of `site-pages.js`, and
+`site-pages.test.ts` has an assertion literally named _"declares every field the
+documents set, so Prismic strips nothing"_ — which is why the gap read as
+covered. That check compares documents against the **slice models**, and every
+model was present and correct. The zone is a separate declaration in a separate
+file, and nothing compared anything to it.
+
+`src/lib/slice-zone.test.ts` now asserts it in both directions: the set of
+`model.json` ids on disk equals the set of zone choices (14 = 14), and every
+slice type `documents()` publishes is in the zone. The mirror direction is not
+padding — a slice offered to an editor with no component behind it renders
+nothing, which is the same failure wearing the other hat.
+
+**Favicon: the placeholder that answered 200.** `static/favicon.png` was the
+template default — 128×128, 8-bit grey+alpha, 1571 bytes — and it existed, and
+it served, and `curl` said `status=200 type=image/png`. Every check that asks
+"does the icon resolve" was green while the tab looked blank. Now both of the
+reference's own icons ship as files: `favicon.png` (32×32) and
+`apple-touch-icon.png` (256×256, previously pointed at `favicon.png`). The test
+asserts byte equality with the captured originals rather than existence, because
+existence is precisely what was already true.
+
+**The guards were broken on purpose before being kept.** The slice-zone check
+was run with `navy_contact` deleted from the zone (both assertions red, naming
+`navy_contact`); the icon check with the old placeholder restored (red); the
+module-scope-read check with a synthetic `readFileSync(resolve(ROOT,
+"matching/spec/index.html"))` appended to `NavyContact.test.ts` (red, naming
+`NavyContact.test.ts:524`). Its limit, stated because it will matter later: it
+matches a read call and `matching/` on one unindented line, so a module-scope
+read spread across several lines walks past it. It catches the shape that
+actually shipped, not the class.
+
+**What is NOT done.** The home document is still not seeded. The order is now
+forced and worth writing down: the slice models and the custom type only reach
+Prismic when `prismic-models`' apply job runs, and that job runs on push to
+`main` and nowhere else — so #12 must merge before a seed can succeed, and a
+seed run before it would have published nothing either. After the seed,
+`svelte.config.js`'s four-id `AWAITING_SEED` allowlist comes out. The nine
+template slices remain in the zone on what is a one-page site; leaving them is
+deliberate (the apply job never deletes, and no document uses them) but it does
+offer an editor nine ways to break the match. The `Creative Lofts` region is
+still a measurement floor, not a build defect, and the harness fix behind it —
+freezing CSS/JS animation the way `capture.mjs` already freezes `<video>` — is
+still unfiled.

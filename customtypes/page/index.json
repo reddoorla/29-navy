@@ -53,6 +53,21 @@
             },
             "cta_banner": {
               "type": "SharedSlice"
+            },
+            "navy_hero_slider": {
+              "type": "SharedSlice"
+            },
+            "navy_location_band": {
+              "type": "SharedSlice"
+            },
+            "navy_floor_plans": {
+              "type": "SharedSlice"
+            },
+            "navy_resident_links": {
+              "type": "SharedSlice"
+            },
+            "navy_contact": {
+              "type": "SharedSlice"
             }
           }
         }

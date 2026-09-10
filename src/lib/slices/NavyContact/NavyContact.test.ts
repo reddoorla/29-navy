@@ -44,12 +44,38 @@ const ruleBody = (selector: string, indent = "  ") => {
 
 // ---- The reference itself. Rather than retyping the captured markup into the
 // expectations (which would only prove the test agrees with the test), the
-// contact subtree is sliced out of matching/spec/index.html and the expected
-// strings are DERIVED from it. index.html is minified onto one line, so it is
+// contact and navbar subtrees are sliced out of the reference and the expected
+// strings are DERIVED from them. The markup is minified onto one line, so it is
 // addressed by string index, never by line number.
-const REF = readFileSync(resolve(ROOT, "matching/spec/index.html"), "utf8");
-const REF_START = REF.indexOf('<div id="contact" class="section-7">');
-const REF_CONTACT = REF.slice(REF_START, REF.indexOf("<script", REF_START));
+//
+// The source is reference.html, a GENERATED and TRACKED pair of excerpts — not
+// matching/spec/index.html, which is the live capture and is gitignored
+// (`matching/*`, workspace not record). Reading the capture here passed locally
+// and failed CI with ENOENT on a runner that has no capture; a test that only
+// runs where someone happens to have captured the reference is not a test.
+// `agrees with the live capture` below re-derives both excerpts wherever the
+// capture IS present, so the fixture cannot silently drift from it.
+const excerpt = (name: string) => {
+  const src = read("reference.html");
+  const start = src.indexOf(`<!--BEGIN ${name}-->`);
+  const end = src.indexOf(`<!--END ${name}-->`);
+  expect(start, `no ${name} excerpt in reference.html`).toBeGreaterThan(-1);
+  return src.slice(start + `<!--BEGIN ${name}-->`.length, end).trim();
+};
+/** Derivation rules, content-addressed so a recapture that shifts every offset
+    still resolves. Kept identical to the generator's. */
+const SLICE_RULES = {
+  navbar: (ref: string) => {
+    const i = ref.indexOf('<div data-animation="default"');
+    return ref.slice(i, ref.indexOf("</div></div></div>", i) + "</div></div></div>".length);
+  },
+  contact: (ref: string) => {
+    const i = ref.indexOf('<div id="contact" class="section-7">');
+    return ref.slice(i, ref.indexOf("<script", i));
+  },
+};
+const REF_CONTACT = excerpt("contact");
+const REF_NAVBAR = excerpt("navbar");
 /** The reference's own 8-candidate srcset, with the Webflow CDN prefix
     rewritten to the local capture path. */
 const REF_SRCSET = REF_CONTACT.match(/srcset="([^"]+)"/)![1]
@@ -229,7 +255,7 @@ describe("NavyContact slice", () => {
     const container = mount();
     expect(container.querySelector("#contact")).not.toBeNull();
     expect(SOURCE).toContain('id="contact"');
-    expect(REF).toContain('href="#contact"');
+    expect(REF_NAVBAR).toContain('href="#contact"');
     // Not authorable: no field in the model can move it.
     const model = JSON.parse(read("model.json"));
     expect(Object.keys(model.variations[0].primary)).not.toContain("id");
@@ -386,7 +412,7 @@ describe("NavyContact slice", () => {
     // that combination. Svelte's scoping is what keeps ref css:2439-2444 off
     // them — a :global escape here would silently resize the navbar, and
     // nothing in this section's gate would catch it.
-    expect(REF).toContain('class="nav-link-2 text-block-11 w-nav-link"');
+    expect(REF_NAVBAR).toContain('class="nav-link-2 text-block-11 w-nav-link"');
     expect(CSS).not.toContain(":global");
     expect(CSS).not.toContain("nav-link-2");
   });
@@ -467,5 +493,30 @@ describe("NavyContact slice", () => {
     expect(urls.length).toBe(10);
     const missing = urls.filter((u) => !existsSync(resolve(ROOT, "static", u.replace(/^\//, ""))));
     expect(missing).toEqual([]);
+  });
+
+  it("agrees with the live capture, wherever the live capture exists", () => {
+    // reference.html is a frozen copy, so on its own it can only prove this
+    // test agrees with itself. This closes that: where matching/spec/index.html
+    // IS present — every machine that has run the harness, which is every
+    // machine where a geometry claim gets made — both excerpts are re-derived
+    // from it and compared byte for byte. A recapture that moves the reference
+    // reds HERE, naming the excerpt, instead of surfacing as an unexplained
+    // gate failure three regions later.
+    //
+    // Guarded on existsSync rather than skipped unconditionally: a CI runner
+    // has no capture and must still run everything above. This assertion is the
+    // one thing it genuinely cannot check, and it denies a green — it never
+    // grants one.
+    const capture = resolve(ROOT, "matching/spec/index.html");
+    if (!existsSync(capture)) return;
+    const ref = readFileSync(capture, "utf8");
+    for (const [name, rule] of Object.entries(SLICE_RULES)) {
+      const derived = rule(ref);
+      expect(derived.length, `${name} rule matched nothing in the capture`).toBeGreaterThan(0);
+      expect(excerpt(name), `reference.html's ${name} excerpt has drifted from the capture`).toBe(
+        derived,
+      );
+    }
   });
 });
