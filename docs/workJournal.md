@@ -545,3 +545,104 @@ re-runnable.
 **One thing this changes for every later session:** `main` is protected now.
 Direct pushes are refused; this entry arrived by pull request, which is also the
 first exercise of that path.
+
+## 2026-09-09 — Phase 0/1: the reference captured before it could die, and the gate caught lying (`docs/29navy-phase-0-1`)
+
+29 Navy is the `match-harness` recipe's first real customer. Everything under
+`matching/` here was installed by `reddoor-maint match-harness`, not by hand —
+20 paths in one commit — and the install went straight into the guard that
+reddoorla/reddoor-maintenance#734 had added hours earlier: every installed path
+has to be found in HEAD's tree before the recipe will call itself `applied`.
+
+**The capture is the point of Phase 0 and it is time-boxed by someone else's
+decision.** Beachfront's reference died mid-campaign; running
+`harness.mjs --check-ref` against it today still answers `HTTP 404`. 29navy.com
+dies at DNS cutover. So: 90 files, 13,667,608 bytes, into git-ignored
+`matching/spec/`, with a tracked manifest carrying a sha256 per file so a fresh
+clone can tell whether its capture is the one `SPEC.md` was written from. Nothing
+is rewritten — the CDN stylesheet href in `matching/spec/index.html` is still
+absolute — because the capture is what Phase 1 greps, and a rewritten href would
+make it lie about what the reference loads.
+
+It fails closed, and that was proved by breaking it rather than asserted: point
+the stylesheet at `nope.css` and it exits 2 naming the 403; move
+`EXPECT.htmlAssets` from 58 to 57 and it exits 2, prints all 58 URLs grouped,
+and says `group counts moved`. The URLs are printed rather than just the delta
+because a count can move because the reference changed OR because a classifier
+mis-sorted a filename, and "the reference moved" sends you to inspect a page
+that did not.
+
+**Four things the plan asserted that measurement contradicted.** Recording all
+four, because the pattern matters more than any one of them: a plan written from
+the previous site carries that site's shape.
+
+1. _The matrix._ The recipe seeds `1440 / 834 / 390`. The reference's own
+   stylesheet has twelve `@media` blocks whose three site-authored members are
+   `max-width` 991, 767 and 479 — so the matrix is `1440 / 991 / 767 / 390` and
+   the seed would have missed two of four bands. Max-width blocks cascade
+   downward, so the 480–767 values are usually inherited from the ≤991 block
+   rather than declared.
+2. _The fonts._ The plan said all three Font Awesome faces must report
+   `document.fonts.check` true, warning that a missing weight synthesizes
+   silently and poisons the census. Two report false — and that is correct.
+   `Fa 400` and `Fa brands 400` appear only inside their own `@font-face`
+   blocks; of 190 elements on the live page, 0 compute to either, and the
+   `FontFaceSet` lists both `unloaded`. A browser does not fetch a webfont
+   nothing uses. Had this been "fixed", the fix would have been to a bug that
+   does not exist.
+3. _The first floor._ The plan counted ten `display: none` modal containers
+   including `._1st-floor-modal`. Measured at 1440 it is `display: flex`,
+   in flow, **1174×750 at (246, 1908)** — the default visible panel of a floor
+   switcher, not a modal. Nine are hidden. A rebuild that hid all four would be
+   ~750px shorter than the reference and would blow `maxHeightDelta` for the
+   whole page, and the symptom would read as a layout bug rather than a missing
+   initial state. This is the one that would have cost a day in Phase 5.
+4. _The probe order._ The plan ran the calibration probe before writing the
+   derived matrix, which would have calibrated at 834 and then shipped 991/767.
+   The matrix went in first here.
+
+**And the gate itself reports a green it did not measure.** `bash matching/gate.sh
+smoke home` with no dev server prints
+
+```
+########## home ##########
+home exit=1
+ALL DONE (smoke)
+```
+
+and exits **0**. `gate.sh:120` is `echo "$page exit=$?"` — it prints the status
+and discards it; the only non-zero paths out of the script are the two preflight
+exits and the missing-SPEC branch. No `report.json` was written. `next.mjs`
+catches the total-failure case (exit 2, "no parseable gate run") but not the
+partial one: its denominator is summed over the pages that produced a report, so
+a page whose `page-diff` crashed leaves the score altogether — eight of nine
+pages could report `SCORE 160/160` while the ninth was never measured. Filed as
+reddoorla/reddoor-maintenance#744; both files are recipe-owned, so the fix lands
+in `beachfront-dentistry` and is regenerated, the path
+reddoorla/beachfront-dentistry#58 took. **No Phase 2 score from this gate is
+trustworthy until that lands**, and the ledger says so at the point of use.
+
+Measuring the measuring device was also worth it in the other direction: my own
+first reading said `next.mjs` exits 0 on its refusal. It exits 2 — the 0 was
+`head`'s status through a pipe. The same trap ate the exit code of a
+`pnpm preview` check earlier the same evening, where two `/dev/match/home → 404`
+readings turned out to have come from **someone else's server**: three orphaned
+`vite preview` processes had been holding ports 4173–4175 since Sep 6, and
+`--strictPort` plus a positive identification of the build (`_app/immutable` ×18,
+Webflow site id ×0) is what caught it. A 404 from a server that is not yours
+looks exactly like a working guard.
+
+**The reference's own defects are ledgered, not silently corrected.** Four
+floor-plan PDFs 404 from the apex, from `www` and over `http`, with a 200
+control in the same run so it is the files that are gone and not the network
+(#8 — a client deliverable, never to be redrawn). A phone link written
+`href="https://(310) 393-9653"`. An email whose address carries a zero width
+joiner, `e2 80 8d`, between `.com` and the closing quote. And 23 of 23 `<img>`
+with `alt=""`, pre-declared as artifact class 4 so that 23 expected text-diff
+rows in Phase 2 are not mistaken for 23 defects.
+
+Phase 1's spec cites twenty stylesheet line numbers, every one verified by
+reading the line it names. The gate was watched refusing for a missing
+`## home` section **before** `SPEC.md` existed, because once the file exists
+that refusal cannot be reproduced without deleting it again, and a gate never
+seen to refuse is not evidence that it can.
