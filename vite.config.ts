@@ -13,7 +13,10 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{js,ts}"],
+    // scripts/ too, not just src/. scripts/import/seed-home.mjs writes to a
+    // live CMS; "it is only a script" is exactly the reasoning that leaves the
+    // irreversible code as the untested code.
+    include: ["src/**/*.test.{js,ts}", "scripts/**/*.test.{js,ts}"],
     setupFiles: ["./vitest-setup.ts"],
     server: {
       deps: {

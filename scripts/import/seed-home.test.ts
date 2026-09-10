@@ -1,0 +1,196 @@
+import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { NotFoundError } from "@prismicio/client";
+
+import { assetPath, buildPlan, createImageResolver, formatReport } from "./seed-home.mjs";
+import { documents } from "../../src/lib/site-pages.js";
+
+const ROOT = process.cwd();
+
+/** A migration that records instead of uploading. */
+const fakeMigration = () => {
+  const created: Array<{ filename: string; alt?: string }> = [];
+  const docs: Array<{ kind: "create" | "update"; doc: Record<string, unknown>; title?: string }> =
+    [];
+  return {
+    created,
+    docs,
+    createAsset: (_file: unknown, filename: string, params: { alt?: string } = {}) => {
+      created.push({ filename, alt: params.alt });
+      return { __asset: filename };
+    },
+    createDocument: (doc: Record<string, unknown>, title: string) => {
+      docs.push({ kind: "create", doc, title });
+    },
+    updateDocument: (doc: Record<string, unknown>, title: string) => {
+      docs.push({ kind: "update", doc, title });
+    },
+  };
+};
+
+const stubBytes = () => Buffer.from("0123456789");
+
+describe("seed-home is inert on import", () => {
+  it("does nothing when imported rather than run", () => {
+    // The one property that matters most in this file. Earlier in this project
+    // a sibling script was imported purely to syntax-check it and executed
+    // against the live reference on import; the same mistake here is a CMS
+    // write. main() is behind an argv[1] check, so importing must produce no
+    // output at all — not a dry-run report, not a network call.
+    const out = execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `await import(${JSON.stringify("./scripts/import/seed-home.mjs")})`,
+      ],
+      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    expect(out.trim()).toBe("");
+  });
+});
+
+describe("assetPath", () => {
+  it("decodes percent-encoded URLs to the files actually on disk", () => {
+    // These three exist because the reference serves them encoded and the
+    // capture saved them decoded. Reading static/<url> verbatim finds nothing
+    // for exactly these, and only after 21 other assets are already uploaded.
+    const encoded = [
+      "/29navy/assets/615330625afda8f3e747c53f_Untitled%20design%20(16).png",
+      "/29navy/assets/6153308fcb691617e9de8587_Untitled%20design%20(17).png",
+      "/29navy/assets/615330c04bb71e65b9ff085c_Untitled%20design%20(18).png",
+    ];
+    for (const url of encoded) {
+      expect(assetPath(url)).toContain("Untitled design (");
+      expect(existsSync(assetPath(url)), `${url} did not resolve to a real file`).toBe(true);
+    }
+  });
+
+  it("is rooted in static/, not in the repo root", () => {
+    expect(assetPath("/29navy/assets/x.png")).toBe(resolve(ROOT, "static/29navy/assets/x.png"));
+  });
+});
+
+describe("createImageResolver", () => {
+  it("uploads one asset per file, not one per usage", () => {
+    // site-pages.js makes 25 img() calls for 24 files: the aerial is used by
+    // both the hero's mobile band and the location band. Without dedup the
+    // media library gets two copies and the two fields point at different
+    // assets, which an editor then has to keep in sync by hand.
+    const migration = fakeMigration();
+    const { img, assets } = createImageResolver({ migration, readFile: stubBytes });
+    let calls = 0;
+    documents((url: string, alt: string) => {
+      calls++;
+      return img(url, alt);
+    });
+    expect(calls).toBe(25);
+    expect(assets.size).toBe(24);
+    expect(migration.created.length).toBe(24);
+  });
+
+  it("carries the alt text through to the asset", () => {
+    const migration = fakeMigration();
+    const { img } = createImageResolver({ migration, readFile: stubBytes });
+    img("/29navy/assets/a.png", "A lit brick facade.");
+    expect(migration.created[0]).toEqual({
+      filename: "a.png",
+      alt: "A lit brick facade.",
+    });
+  });
+
+  it("refuses one file with two different alt strings, naming both", () => {
+    // Prismic stores alt on the asset and silently keeps the first. Letting it
+    // pick means the losing string vanishes with no error anywhere.
+    const migration = fakeMigration();
+    const { img } = createImageResolver({ migration, readFile: stubBytes });
+    img("/29navy/assets/a.png", "First description.");
+    expect(() => img("/29navy/assets/a.png", "Second description.")).toThrow(
+      /First description[\s\S]*Second description/,
+    );
+  });
+
+  it("refuses a file type it has no MIME type for", () => {
+    const migration = fakeMigration();
+    const { img } = createImageResolver({ migration, readFile: stubBytes });
+    expect(() => img("/29navy/assets/a.psd", "x")).toThrow(/unknown media type/);
+  });
+});
+
+describe("buildPlan", () => {
+  const assemblies = [
+    {
+      type: "page",
+      uid: "home",
+      title: "29 Navy",
+      data: { slices: [{ slice_type: "navy_contact" }] },
+    },
+  ];
+
+  it("UPDATES the document that already holds the uid", async () => {
+    // The idempotence property. The write client creates whenever the document
+    // it is handed has no id, so a plan that skips the lookup leaves a second
+    // `home` page on every run and the route serves whichever Prismic answers.
+    const migration = fakeMigration();
+    const client = {
+      getByUID: async () => ({ id: "aqCp8REAADEAeC8A", data: { slices: [], title: "kept" } }),
+    };
+    const plan = await buildPlan({ migration, client, assemblies });
+    expect(plan[0].existingId).toBe("aqCp8REAADEAeC8A");
+    expect(plan[0].slicesBefore).toBe(0);
+    expect(migration.docs[0].kind).toBe("update");
+    expect(migration.docs[0].doc.id).toBe("aqCp8REAADEAeC8A");
+    // Fields the assembly does not mention survive — the seed writes slices,
+    // it does not blank the SEO tab.
+    expect((migration.docs[0].doc.data as Record<string, unknown>).title).toBe("kept");
+  });
+
+  it("CREATES when nothing holds the uid yet", async () => {
+    const migration = fakeMigration();
+    const client = {
+      getByUID: async () => {
+        throw new NotFoundError("nope", "", undefined);
+      },
+    };
+    const plan = await buildPlan({ migration, client, assemblies });
+    expect(plan[0].existingId).toBeNull();
+    expect(migration.docs[0].kind).toBe("create");
+  });
+
+  it("rethrows anything that is not a genuine miss", async () => {
+    // A bad token or a wrong repository name must not read as "no such page"
+    // and quietly become a create.
+    const migration = fakeMigration();
+    const client = {
+      getByUID: async () => {
+        throw new Error("403 Forbidden");
+      },
+    };
+    await expect(buildPlan({ migration, client, assemblies })).rejects.toThrow("403 Forbidden");
+  });
+});
+
+describe("formatReport", () => {
+  it("says what changes, and warns that assets are the irreversible half", () => {
+    const report = formatReport({
+      repositoryName: "29-navy",
+      apply: false,
+      plan: [
+        {
+          assembly: { type: "page", uid: "home", title: "29 Navy" },
+          existingId: "abc123",
+          slicesBefore: 0,
+          slices: [{ slice_type: "navy_contact" }],
+        },
+      ],
+      assets: new Map([["/a.png", { filename: "a.png", alt: "An alt.", bytes: 2048 }]]),
+    });
+    expect(report).toContain("DRY RUN");
+    expect(report).toContain("UPDATE abc123  page/home");
+    expect(report).toContain("slices: 0 → 1  [navy_contact]");
+    expect(report).toContain("alt: An alt.");
+    expect(report).toContain("the assets are not");
+  });
+});
