@@ -143,3 +143,63 @@ was read out of the captured HTML in `matching/spec/index.html`, not inferred.
   CSS/JS animation the way it already freezes video (the real fix, and not this
   repo's to make); or lower the settle below the first advance, which is a
   fleet-wide change to someone else's tool. **Presented, not decided.**
+
+## 2026-09-10 — Phase 5: the slider moves, and two deviations it forced
+
+### `Creative Lofts` stays a floor, and the motion did not change that
+
+Recorded against the entry above, which offered four ways out. Two of them have
+now happened and the number did not move: the harness learned to freeze
+animation (reddoorla/claude-skills#3) and this rebuild implements the autoplay.
+Gate before **16/20**, gate after **16/20** — `Creative Lofts` fails at 34.1–37.9%
+across all four viewports, within a point of where it was.
+
+That is the expected result, not a disappointment, and it narrows the diagnosis
+usefully. The freeze pins looping **CSS** animations to a known phase. A Webflow
+slider advancing on `setInterval` is not a CSS animation, `getAnimations()`
+cannot see it, and freezing stops it moving without making two captures agree on
+_where_ it stopped. Both sides now move; both are photographed at an
+independently-chosen slide.
+
+The remaining fix is a faked page clock, and the findings from attempting it are
+on reddoorla/claude-skills#2 — `install()` alone keeps ticking with real time so
+`runFor` double-counts, and pausing the clock either side of `goto()` hangs
+navigation. Until that lands, this region is a **declared floor**: the build is
+right and the instrument cannot photograph it.
+
+### The dot nav is indicators, not controls (accessibility vs the reference)
+
+The reference's runtime DOM gives every `.w-slider-dot` `role="button"`,
+`tabindex="0"`, `aria-label="Show slide N of 6"` and `aria-pressed`, and they are
+clickable. Reproducing that **fails this repo's axe gate**: `target-size`, WCAG
+2.2 AA 2.5.8, serious, six nodes. The dots are `1em` = 14px with `margin: 0 3px`
+(ref css:1262) — 14px targets on a 20px pitch, where the rule wants 24 of either
+the size or the spacing. Neither exemption can be met without moving pixels the
+geometry gate measures, so the reference cannot pass this rule as drawn.
+
+Resolved by leaving the dots as visual indicators and putting the interaction on
+the arrows, which are large enough and carry the reference's own runtime
+`role`/`tabindex`/`aria-label`/`aria-controls`. Left and Right arrow keys work
+anywhere inside the carousel, because without the dots the only way to reach
+slide 5 by keyboard would be four activations of one arrow.
+
+**What it costs:** click-a-dot-to-jump. A sighted mouse user loses an affordance
+the reference has. **Reversing it** means either accepting an axe failure or
+redrawing the dot nav at 24px, which the gate would see. Operator's call.
+
+### The off-screen slide arrangement differs, invisibly
+
+The reference moves by giving every `.w-slide` the same inline
+`transform: translateX(-index × width)`, and at the wrap hands the outgoing slide
+a one-off `-n × width` so it exits left while slide 1 enters from the right —
+measured at 1440, in slide-widths:
+
+    on slide 6   -5 -4 -3 -2 -1  0
+    after wrap    0  1  2  3  4 -1
+
+so its off-screen arrangement depends on history. This rebuild keeps a per-slide
+offset instead — the standard carousel form — which reaches the same visible
+result by a different internal route. `.w-slider-mask` is `overflow: hidden`
+(ref css:1198), so every position outside [0, 1) slide-widths is clipped and
+cannot differ on screen. Measured cadence: reference advances every **3011ms**,
+this build every **3012ms**.

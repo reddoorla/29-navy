@@ -1,5 +1,6 @@
 import { render, cleanup } from "@testing-library/svelte";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { tick } from "svelte";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -43,7 +44,10 @@ const mount = () => render(NavyHeroSlider, { props: { slice } });
 // vitest runs without `globals`, so @testing-library/svelte never registers its
 // own auto-cleanup and every render would otherwise stay in document.body —
 // getByAltText then finds the same logo once per earlier test.
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("NavyHeroSlider slice", () => {
   it("renders the harness anchor 'Creative Lofts' exactly, split by a <br>", () => {
@@ -126,9 +130,12 @@ describe("NavyHeroSlider slice", () => {
     const src = readFileSync(join(HERE, "index.svelte"), "utf8");
     const maskLine = src
       .split("\n")
-      .find((l) => l.includes('<div class="w-slider-mask">') && l.includes("{#each"));
+      .find((l) => l.includes('class="w-slider-mask"') && l.includes("{#each"));
     expect(src).toContain("<!-- prettier-ignore -->");
-    expect(maskLine).toMatch(/<div class="w-slider-mask">\{#each[\s\S]*\{\/each\}<\/div>$/);
+    // Attributes on the mask are free to change — the id the arrows
+    // aria-control was added after this test was written. What must not change
+    // is that the `{#each}` and every slide stay on ONE line.
+    expect(maskLine).toMatch(/class="w-slider-mask"[^>]*>\{#each[\s\S]*\{\/each\}<\/div>$/);
   });
 
   it("sizes the logo from the HTML width attribute and gives it no height", () => {
@@ -200,7 +207,13 @@ describe("NavyHeroSlider slice", () => {
     // six class rules show through instead of .w-slider's grey (ref css:1191).
     const bareSlides = [...container.querySelectorAll(".w-slider-mask > div")];
     expect(bareSlides).toHaveLength(6);
-    expect(bareSlides.every((el) => !el.hasAttribute("style"))).toBe(true);
+    // No inline background-image, so the six class rules show through. Slides
+    // DO carry an inline style now — the carousel's transform lives there — so
+    // asserting the attribute is absent would fail for a reason that has
+    // nothing to do with the fallback this test is about.
+    expect(bareSlides.every((el) => !/background-image/.test(el.getAttribute("style") ?? ""))).toBe(
+      true,
+    );
     // The anchor, by contrast, is NOT defaulted: no tagline, no text.
     expect(container.querySelector(".text-block")?.textContent?.trim()).toBe("");
   });
@@ -221,5 +234,162 @@ describe("NavyHeroSlider slice", () => {
         (item: { value: [string, { url: string }][] }) => item.value[0][1].url,
       ),
     ).toEqual(SLIDE_FILES.map((f) => A + f));
+  });
+
+  describe("motion", () => {
+    // Every number below is the reference's own: data-delay="3000",
+    // data-duration="500", data-easing="ease", data-infinite="true".
+    const xs = (container: Element) =>
+      [...container.querySelectorAll(".w-slide")].map((el) => {
+        const m = /translateX\((-?\d+)%\)/.exec(el.getAttribute("style") ?? "");
+        return m ? Number(m[1]) / 100 : NaN;
+      });
+
+    const mountSlider = () => render(NavyHeroSlider, { props: { slice } }).container;
+
+    it("starts as plain document order, like the reference before it moves", () => {
+      // Measured on the live reference at rest: every slide carries
+      // translateX(0px) and they sit at 0, 1440, 2880 … — the carousel has not
+      // rearranged anything yet.
+      expect(xs(mountSlider())).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+
+    it("advances one slide every 3000ms on its own", async () => {
+      vi.useFakeTimers();
+      const container = mountSlider();
+      expect(xs(container)[0]).toBe(0);
+      await vi.advanceTimersByTimeAsync(3000);
+      await tick();
+      // Everything shifted left by one: slide 1 is now off to the left.
+      expect(xs(container)).toEqual([-1, 0, 1, 2, 3, 4]);
+      expect(container.querySelectorAll(".w-slider-dot.w-active")).toHaveLength(1);
+      expect(
+        [...container.querySelectorAll(".w-slider-dot")][1]!.classList.contains("w-active"),
+      ).toBe(true);
+    });
+
+    it("loops forward at the wrap instead of rewinding", async () => {
+      // The measured reference behaviour, and the reason this is not just
+      // `index + 1`: at the wrap the outgoing slide keeps moving LEFT while the
+      // incoming one arrives from the RIGHT. Rewinding through five slides
+      // would be the obvious implementation and is visibly wrong.
+      vi.useFakeTimers();
+      const container = mountSlider();
+      for (let i = 0; i < 6; i++) {
+        await vi.advanceTimersByTimeAsync(3000);
+        await tick();
+      }
+      const after = xs(container);
+      // Back on slide 1, with the last slide parked just off to the LEFT.
+      expect(after[0]).toBe(0);
+      expect(Math.min(...after)).toBe(-1);
+      // Nothing is ever more than one slide-width to the left: a slide that
+      // would go further teleports to the far end instead.
+      expect(after.filter((x) => x < -1)).toEqual([]);
+    });
+
+    it("does not animate the slide that teleports across the strip", async () => {
+      // The one move that must not tween. It crosses the whole strip, so
+      // animating it would drag a photograph across the viewport backwards.
+      // Driven by clicks, not timers: the flag that suppresses the tween is
+      // cleared on the next animation frame, and advancing fake timers flushes
+      // rAF too — so a timer-driven version of this test reads the state AFTER
+      // the thing it is trying to observe. `tick()` is a microtask; rAF is not.
+      const container = mountSlider();
+      const next = container.querySelector(".w-slider-arrow-right") as HTMLElement;
+      next.click();
+      await tick();
+      next.click();
+      await tick();
+      const styles = [...container.querySelectorAll(".w-slide")].map(
+        (el) => el.getAttribute("style") ?? "",
+      );
+      const none = styles.filter((s) => s.includes("transition: none"));
+      const tweened = styles.filter((s) => s.includes("transform 500ms ease"));
+      expect(none).toHaveLength(1);
+      expect(tweened).toHaveLength(5);
+    });
+
+    it("steps from the arrows, and the dots only report", async () => {
+      // The dots are INDICATORS here, not controls. Reproducing the
+      // reference's clickable role="button" dots fails the axe gate on
+      // target-size (WCAG 2.2 2.5.8): they are 1em = 14px on a 20px pitch
+      // (ref css:1262) and neither the 24px size nor the 24px spacing
+      // exemption can be met without moving pixels the geometry gate measures.
+      const container = mountSlider();
+      const dots = [...container.querySelectorAll(".w-slider-dot")] as HTMLElement[];
+      for (const dot of dots) {
+        expect(dot.getAttribute("role")).toBeNull();
+        expect(dot.getAttribute("tabindex")).toBeNull();
+      }
+      const next = container.querySelector(".w-slider-arrow-right") as HTMLElement;
+      next.click();
+      await tick();
+      expect(dots[1].classList.contains("w-active")).toBe(true);
+      (container.querySelector(".w-slider-arrow-left") as HTMLElement).click();
+      await tick();
+      expect(dots[0].classList.contains("w-active")).toBe(true);
+    });
+
+    it("moves on Left and Right from inside the carousel", async () => {
+      // The affordance the dots used to carry. Without it, reaching slide 5 by
+      // keyboard is four activations of one arrow.
+      const container = mountSlider();
+      const region = container.querySelector(".slider.w-slider") as HTMLElement;
+      const dots = [...container.querySelectorAll(".w-slider-dot")];
+      region.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      await tick();
+      expect(dots[1].classList.contains("w-active")).toBe(true);
+      region.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+      await tick();
+      expect(dots[0].classList.contains("w-active")).toBe(true);
+    });
+
+    it("carries the reference's own runtime a11y attributes", () => {
+      // Webflow's slider adds these at runtime, and the gate measures the
+      // reference WITH its JS running — so they are part of what is matched,
+      // and they are what makes a div-built control usable by keyboard.
+      const container = mountSlider();
+      const region = container.querySelector(".slider.w-slider")!;
+      expect(region.getAttribute("role")).toBe("region");
+      expect(region.getAttribute("aria-label")).toBe("carousel");
+      expect(container.querySelector(".w-slider-mask")!.id).toBe("w-slider-mask-0");
+      for (const [sel, label] of [
+        [".w-slider-arrow-left", "previous slide"],
+        [".w-slider-arrow-right", "next slide"],
+      ] as const) {
+        const el = container.querySelector(sel)!;
+        expect(el.getAttribute("role")).toBe("button");
+        expect(el.getAttribute("tabindex")).toBe("0");
+        expect(el.getAttribute("aria-label")).toBe(label);
+        expect(el.getAttribute("aria-controls")).toBe("w-slider-mask-0");
+      }
+    });
+
+    it("never autoplays under prefers-reduced-motion", async () => {
+      // The reference has no reduced-motion handling at all; this is the
+      // repo's, per docs/accessibility.md. An auto-advancing carousel is the
+      // canonical thing that setting is for.
+      const original = window.matchMedia;
+      window.matchMedia = ((q: string) =>
+        ({
+          matches: q.includes("prefers-reduced-motion"),
+          media: q,
+          addEventListener() {},
+          removeEventListener() {},
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      try {
+        vi.useFakeTimers();
+        const container = mountSlider();
+        await vi.advanceTimersByTimeAsync(12000);
+        await tick();
+        expect(xs(container)).toEqual([0, 1, 2, 3, 4, 5]);
+        expect(container.querySelector(".w-slide")!.getAttribute("style")).toContain(
+          "transition: none",
+        );
+      } finally {
+        window.matchMedia = original;
+      }
+    });
   });
 });
