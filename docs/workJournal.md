@@ -1593,3 +1593,67 @@ the only one without.
 (under the 24px target minimum) and its `<dialog>` has no accessible name;
 `LandscapeModal` never moves focus into itself; and the six popups sit outside
 the axe gate's scope entirely, so the green says nothing about them.
+
+## 2026-09-11 — A check fires after the cost; the index fires before it (#25)
+
+Operator, on my proposal to catch component reinvention with a CI audit: "this
+feels retroactive, when the goal is to avoid doing duplicate work, so by the time
+you've run the check the cost of failing has already occurred."
+
+Correct, and it inverts the design. I had optimised for _unevadable_ when the
+goal is _never started_. A gate that fails in CI saves the merge; it does not
+save the hour, and the hour is the thing being wasted. Worse, I had ranked the
+three candidate designs by fleet reach and evadability — both properties of a
+detector — and put discoverability last, which was the only one of the three
+that fires before the work.
+
+**What shipped is the cheapest layer and the earliest-firing one.**
+`scripts/capability-index.mjs` generates `docs/COMPONENTS.md`: 50 modules from
+`src/lib`, each with its real prop/export names, test count, and its own first
+sentence where it left one. `CLAUDE.md`'s Orientation table points at it, so it
+is in front of an agent before any decision rather than after any commit.
+
+**No `@provides` tags.** A tag nobody updates is worse than no tag, and the
+authoring tax falls on exactly the person already not reading the directory.
+Prop names are the capability surface, cost nothing to extract, and cannot drift
+because they ARE the code. The Slider row reads
+`itemCount, label, cardsPerView, mode, loop, autoplay, showDots, showArrows…` —
+that is unmissable in a way a sentence I wrote would not be.
+
+**Why this is not "more prose".** CLAUDE.md already said to check for existing
+work. I read it at session start and re-derived three things anyway. The
+instruction was never missing; the DATA was. Before today nothing in this repo
+put the string `Slider.svelte` next to the word "carousel". Recognition is a
+different mechanism from recall, and only one of them had been tried.
+
+**Its own test caught the first real defect in it.** The generator began with an
+allowlist — components, actions, utils, stores — and the test asserting that the
+three actually-re-derived modules appear failed immediately: `transitions.ts`
+sits at the TOP level of `src/lib`, outside all four, and it exports
+`prefersReducedMotion`, which is one of the three. An allowlist encodes a guess
+about where people put things. It is now `src/lib` minus `src/lib/slices`, and
+the count went 40 → 50.
+
+**A generated file cannot also be a formatted file.** Prettier realigns markdown
+tables, which rewrote every row and left the freshness check failing forever
+against a file nobody had edited. `docs/COMPONENTS.md` is in `.prettierignore`
+with the reason.
+
+**What this does NOT solve, stated plainly.**
+
+- It is advisory. Nothing stops an agent that does not read it. The honest claim
+  is that recognition beats recall, not that this is enforcement.
+- It reaches this repo only. `CLAUDE.md` propagates from the starter, so the row
+  and the generator can, but `.claude/` — where a `UserPromptSubmit` or
+  `PreToolUse` hook would live, and hooks are the only surface that can
+  _interrupt_ before the writing starts — is gitignored at
+  `reddoor-starter/.gitignore:12`. Shipping hooks fleet-wide needs that policy
+  changed first, which is the operator's call.
+- The staleness test IS retroactive, deliberately. It guards the index, not the
+  decision.
+
+**The ladder, for whoever picks this up.** Earliest-firing first: inventory in
+context (shipped) → `UserPromptSubmit` hook injecting matched entries →
+`PreToolUse` on writes to `src/lib/slices/**` → CI audit as the backstop for
+authors who bypass all three. Only the last needs an `@reddoorla/maintenance`
+release, which is why I had reached for it first and why that was backwards.
