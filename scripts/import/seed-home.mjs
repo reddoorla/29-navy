@@ -70,10 +70,27 @@ export const assetPath = (url, root = ROOT) =>
  * @returns {{img: (url: string, alt: string) => unknown, assets: Map<string, object>}}
  *   `assets` is keyed by URL — one entry per FILE, not per usage.
  */
-export function createImageResolver({ migration, root = ROOT, readFile = readFileSync } = {}) {
+export function createImageResolver({
+  migration,
+  root = ROOT,
+  readFile = readFileSync,
+  published = new Map(),
+} = {}) {
   const assets = new Map();
+  const reused = new Map();
 
   const img = (url, alt) => {
+    // ALREADY IN PRISMIC? Reuse it. @prismicio/client uploads every asset a
+    // migration registers, unconditionally — migrateCreateAssets has no id
+    // check — so without this every re-seed puts a second copy of all 24
+    // images in the media library, and deleting those is manual. Matching on
+    // the original filename works because Prismic keeps it in the asset URL.
+    const already = published.get(sanitizeName(basename(decodeURIComponent(url))));
+    if (already) {
+      reused.set(url, already);
+      return already;
+    }
+
     const existing = assets.get(url);
     if (existing) {
       // Prismic stores alt on the ASSET, so one file has one alt however many
@@ -100,8 +117,39 @@ export function createImageResolver({ migration, root = ROOT, readFile = readFil
     return asset;
   };
 
-  return { img, assets };
+  return { img, assets, reused };
 }
+
+/**
+ * Every filled image field already on a published document, keyed by the
+ * original filename Prismic preserved in the asset URL.
+ *
+ * Prismic sanitises the name on upload — "Untitled design (16).png" comes back
+ * as "…_Untitleddesign-16-.png" — so the key is the sanitised form of the local
+ * filename, matched the same way on both sides.
+ */
+export function publishedImages(data, into = new Map()) {
+  if (Array.isArray(data)) {
+    for (const v of data) publishedImages(v, into);
+  } else if (data && typeof data === "object") {
+    if (typeof data.url === "string" && data.dimensions && data.id) {
+      const name = decodeURIComponent(data.url.split("/").pop().split("?")[0]);
+      // Prismic prefixes its own id: "<id>_<original>". Strip it back off using
+      // the id itself — NOT the first underscore, because the id contains one
+      // ("4uIPMTuS_qroVXjo"). Cutting at the first underscore matched 17 of 24
+      // and silently re-uploaded the other 7.
+      const prefix = `${data.id}_`;
+      const original = name.startsWith(prefix) ? name.slice(prefix.length) : name;
+      into.set(sanitizeName(original), data);
+    }
+    for (const v of Object.values(data)) publishedImages(v, into);
+  }
+  return into;
+}
+
+/** Prismic's own filename normalisation, as observed on the seeded assets:
+ *  spaces dropped, parentheses become hyphens. */
+export const sanitizeName = (name) => name.replace(/\s+/g, "").replace(/[()]/g, "-");
 
 /**
  * Register every assembly on the migration, and say what each one does.
@@ -141,7 +189,7 @@ export async function buildPlan({ migration, client, assemblies, locale = lang }
 }
 
 /** The whole report, as a string, so a test can read what an operator reads. */
-export function formatReport({ repositoryName, apply, plan, assets }) {
+export function formatReport({ repositoryName, apply, plan, assets, reused = new Map() }) {
   const totalBytes = [...assets.values()].reduce((n, a) => n + a.bytes, 0);
   const out = [`\nseed-home · ${repositoryName} · ${apply ? "APPLY" : "DRY RUN"}\n`];
 
@@ -156,7 +204,15 @@ export function formatReport({ repositoryName, apply, plan, assets }) {
     );
   }
 
-  out.push(`\n${assets.size} asset(s), ${(totalBytes / 1024 / 1024).toFixed(1)}MB total:`);
+  if (reused.size)
+    out.push(
+      `\n${reused.size} image(s) already in Prismic — reused, not re-uploaded.` +
+        `\n(@prismicio/client uploads every asset a migration registers, so without` +
+        `\nthis a re-seed would leave a second copy of each in the media library.)`,
+    );
+  out.push(
+    `\n${assets.size} asset(s) to upload, ${(totalBytes / 1024 / 1024).toFixed(1)}MB total:`,
+  );
   for (const a of assets.values()) {
     out.push(`    ${String(Math.round(a.bytes / 1024)).padStart(5)}KB  ${a.filename}`);
     out.push(`             alt: ${a.alt}`);
@@ -240,19 +296,31 @@ async function main() {
     process.env.PRISMIC_REPOSITORY_NAME ||
     JSON.parse(readFileSync(resolve(ROOT, "slicemachine.config.json"), "utf8")).repositoryName;
 
+  const client = prismic.createClient(repositoryName, { fetch });
+
+  // documents() is called TWICE, on purpose. The first pass uses a resolver
+  // that returns nothing: it costs nothing, and all it is for is reading the
+  // uids so the published documents can be fetched before any asset decision
+  // is made. The second pass is the real one, and by then it knows which images
+  // Prismic already holds and can point at them instead of uploading again.
+  const published = new Map();
+  for (const { type, uid } of documents(() => null)) {
+    try {
+      publishedImages((await client.getByUID(type, uid, { lang })).data, published);
+    } catch (err) {
+      if (!(err instanceof prismic.NotFoundError)) throw err;
+    }
+  }
+
   const migration = prismic.createMigration();
-  const { img, assets } = createImageResolver({ migration });
+  const { img, assets, reused } = createImageResolver({ migration, published });
   const assemblies = documents(img);
   if (!assemblies.length) throw new Error("site-pages.js returned no documents");
 
-  const plan = await buildPlan({
-    migration,
-    client: prismic.createClient(repositoryName, { fetch }),
-    assemblies,
-  });
+  const plan = await buildPlan({ migration, client, assemblies });
 
   if (!publishOnly && !verifyOnly)
-    console.log(formatReport({ repositoryName, apply, plan, assets }));
+    console.log(formatReport({ repositoryName, apply, plan, assets, reused }));
 
   // --verify writes nothing and needs no token: it only reads the published ref
   // back and compares. It is the check --apply runs at the end, on its own, so

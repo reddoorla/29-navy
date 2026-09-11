@@ -1267,3 +1267,49 @@ a floor`, `Paying rent online?` and `29 Navy Street` are 0.0/0.0 at all four
 viewports, and the four anchors resolve to identical Y on both sides.
 
 `pnpm verify`: **56 files, 494 tests, 4 smoke, 0 axe violations, exit 0.**
+
+## 2026-09-10 — SEO metadata, and a seeder that would have duplicated 24 assets
+
+Small change, one real defect found on the way to it.
+
+**The seeder was not idempotent for assets, only for documents.** The earlier
+entry claims "UPDATE, never CREATE" and that is true of the _document_; every
+image was a fresh upload on every run. `@prismicio/client`'s
+`migrateCreateAssets` walks `migration._assets` and uploads each one
+unconditionally — there is no id check anywhere in that path — so the second
+seed would have put a duplicate of all 24 images in the media library, and
+deleting those is manual. Nothing would have reported a problem.
+
+Found by asking a narrow question — "what does re-running this actually do?" —
+before running it, which is the only reason it was found before rather than
+after. Fixed by reading the published document first and reusing the image
+fields it already carries: an `img()` whose file is already in Prismic returns
+the existing field instead of registering an upload. Measured: **24 to upload
+before, 0 after.**
+
+`documents()` is now called twice, deliberately. The first pass hands in a
+resolver that returns nothing and exists only to read the uids, so the published
+documents can be fetched before any asset decision is made.
+
+**A bug inside the fix, caught by measurement not by review.** Prismic stores
+assets as `<id>_<original filename>`, so the original is recovered by stripping
+the prefix. Stripping at the first underscore is wrong: **the id itself contains
+one** — `4uIPMTuS_qroVXjo`. That matched **17 of 24** and silently re-uploaded
+the other seven. Visible only because the dry run prints both counts; a fix that
+merely "worked" would have shipped at 71%. Now stripped using the field's own
+`id`, and a test uses an underscore-bearing id specifically.
+
+**The metadata itself is written, not transcribed.** The whole reference carries
+exactly two `<meta>` tags — charset and viewport — and a `<title>` of "29Navy".
+There is no description to copy, so matching the reference here would mean
+shipping none either. That is a gap in the original rather than a spec to
+reproduce, and meta tags render nothing the geometry gate measures. Every phrase
+is lifted from copy already on the page: the hero tagline, the contact block,
+and the Lofts section's own labels. Nothing is claimed that the page does not
+already say. It is **draft copy on a client site and nobody has approved it.**
+
+**Not applied.** The `--apply` run was blocked by this environment's guard on
+writes to live systems, which is the correct call for a CMS write. The change is
+committed and the dry run is clean; one command lands it.
+
+`pnpm verify`: **56 files, 491 tests, 4 smoke, exit 0.**

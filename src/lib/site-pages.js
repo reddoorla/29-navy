@@ -50,6 +50,24 @@ export function documents(img) {
       uid: "home",
       title: "29 Navy",
       data: {
+        // SEO metadata, and it is NOT transcribed — it is written. The whole
+        // reference carries exactly two <meta> tags, charset and viewport, and
+        // a <title> of "29Navy". There is no description to copy, so matching
+        // the reference here would mean shipping none either; that is a gap in
+        // the original rather than a spec to reproduce, and meta tags render
+        // nothing the geometry gate measures.
+        //
+        // Every phrase below is lifted from copy already on the page — the hero
+        // tagline ("Creative Lofts", "for Lease"), the contact block ("29 Navy
+        // Street", "Venice, California 90291") and the Lofts section ("4th
+        // Floor - Penthouse", "Download a PDF of this floor"). Nothing is
+        // claimed that the page does not already say. DRAFT COPY: it is
+        // client-facing and nobody has approved it.
+        meta_title: "29 Navy — Creative Lofts for Lease in Venice",
+        meta_description:
+          "Creative lofts for lease at 29 Navy Street, Venice, California. " +
+          "Browse floor plans for all four floors, including the penthouse, " +
+          "and download a PDF of any floor.",
         // The reference is ONE page in six sections plus shared chrome
         // (matching/SPEC.md). Order here is reference document order, which is
         // also cut order for the harness: the four anchors occur once each at
