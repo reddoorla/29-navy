@@ -354,3 +354,73 @@ So the earlier conclusion stands and its reason is now sharper: the blocker is
 the pitch (`.w-slider-dot { margin: 0 3px }` on a 14px dot, ref css:1262), not
 the size of the box. Passing requires the pitch itself to reach 24px, which
 moves pixels the gate measures. **Still the operator's call**, unchanged.
+
+## Phase 9 — the resident tiles get the hit area their hover already promises (2026-09-11)
+
+**Deviation, at the operator's request:** "the whole box should be clickable, not
+just the text."
+
+**The reference has the same defect.** Every tile is
+`div.div-block-9 > a.link-block-N.w-inline-block > div.text-block-8`. The eight
+anchor classes get `text-decoration: none` and nothing else (ref css:2456, :2518,
+:2618, :2678); their only box rule is `.w-inline-block { max-width: 100%;
+display: inline-block }` (ref css:246-249). So the anchor's box IS the text's box
+— measured against `matching/spec/index.html` in Chromium, **9.4% of the
+460x124.8 tile for "Hungry?" at 1440, 34.5% at the widest** — while
+`.div-block-9:hover` lights the WHOLE tile `#aa4133` (ref css:2363-2365). The
+tile advertises a hit area it does not have. Inherited, not introduced.
+
+**Not fixed by stretching the anchor.** 80 of the tile's 124.8px are its own
+`padding-top/bottom: 40px` (ref css:2358-2359), and a flex ITEM cannot cover its
+parent's padding — so `flex: 1; align-self: stretch` reaches 64% at best, and it
+shifts glyphs **93.02px left at 1440** (`.text-block-8` is `text-align: left`,
+ref css:2369) while shifting them **0.00px at 991/767/390** (ref css:3141-3143
+flips it to `center`). A pixel regression that passes three of the gate's four
+viewports is worse than no fix at all.
+
+**Fixed** with a stretched-link `::after` on the eight tile anchors, plus
+`position: relative` on `.div-block-9` (the containing block) and on
+`.text-block-8` (so the label still paints above the overlay). An
+absolutely-positioned generated box contributes nothing to flow, and `inset: 0`
+resolves against `.div-block-9`'s **padding box** — the full 460x124.8 including
+both 40px bands. `.link-block-9` and `.link-block-10` live inside popups and are
+deliberately excluded; giving them an overlay would cover the popup body.
+
+Measured on a production build, all four matrix viewports, every tile scrolled to
+centre first (`scroll-behavior: smooth` at app.css:223 makes an unsettled
+`scrollIntoView` report false misses — the first two runs did):
+
+    corner+centre hit-test   ....A  ->  AAAAA   on all 8 tiles x 4 viewports
+    anchor's own box         unchanged, still 6.1%-34.5% of the tile
+    #Residents height        743.19px @1440/991, 1322.38px @767/390 — unchanged
+
+Gate: **20/20**, `Paying rent online?` 0.0% at 1440/991/390 and 1.2% at 767
+(unchanged — pre-existing).
+
+### Modal work shipped alongside
+
+- **Focus containment** now comes from `$lib/actions/trapFocus`, which was in the
+  repo the whole time and handles the outro sequencing these 500ms fades need.
+  The hand-rolled version moved focus in and never contained it: one Tab from the
+  close control walked onto the page behind an opaque 100vw/100vh overlay.
+- `aria-modal="true"` on all six dialogs — without it a screen reader keeps the
+  background in the virtual buffer while Tab says otherwise.
+- The six close controls are **real `<button>`s**. They were
+  `<div role="button" tabindex="0">` with a hand-rolled handler that fired on
+  Space **keydown**, where a real button fires on keyup — so pressing Space,
+  changing your mind and moving off still closed the dialog. Eight `repo a11y`
+  declarations zero the UA button box; no pixel moves.
+- **Backdrop click closes**, matching `components/Modal.svelte:37-39`, with a
+  test for the negative half (a click inside the panel must NOT close).
+- **`aria-expanded` removed.** It was `openKey === modal` — keyed on the modal,
+  not the trigger — and two triggers open `tv_internet`, so opening either
+  announced both as expanded. `aria-haspopup="dialog"` carries the affordance.
+- **Focus restore moved after the outro**, not 500ms before it.
+
+### Checked and rejected, so the next session does not re-derive it
+
+`NavyFloorPlans` hand-rolls exclusive disclosure that
+`components/Accordion.svelte` provides via `allowMultiple={false}`. Reuse is
+blocked: the gate diffs that subtree against transcribed Webflow DOM and the
+component owns its own markup and `transition:slide`. The duplication is ~9 lines
+of key handling. Left as is, deliberately.

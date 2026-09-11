@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { prefersReducedMotion } from "$lib/transitions";
   import type { ImageField } from "@prismicio/client";
 
   // Mirrors model.json. Slice Machine's generated `Content.NavyHeroSliderSlice`
@@ -119,10 +120,6 @@
       index = 0;
     }
   });
-
-  const prefersReducedMotion = () =>
-    typeof window !== "undefined" &&
-    !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
   /** Step the carousel by `delta` slides. Everything shifts by one; whichever
    *  slide falls off the near side jumps to the far end, which is the only move

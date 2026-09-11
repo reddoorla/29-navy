@@ -1526,3 +1526,70 @@ solved problems, and a slice that needs behaviour should be read against it
 before the behaviour gets written. The cost here was not the duplicated
 component; it was re-deriving two answers badly and taking one of them to the
 operator as a novel constraint.
+
+## 2026-09-11 — The resident tiles, the modals, and the third time $lib solved it first (#23)
+
+Two asks: "the modals in the resident section still need some work, and the whole
+box should be clickable, not just the text."
+
+**The tile.** The whole box is clickable now, and the reference never was. Every
+tile is `div.div-block-9 > a.link-block-N > div.text-block-8`; the eight anchor
+classes carry `text-decoration: none` and nothing else, so the anchor's box IS
+the label's box — 9.4% of the 460x124.8 tile for "Hungry?" at 1440. Meanwhile
+`.div-block-9:hover` lights the entire tile. The reference has advertised a hit
+area it does not have since 2021.
+
+The obvious fix is a trap worth writing down. Stretching the anchor
+(`flex: 1; align-self: stretch`) reaches at most 64% of the tile, because 80 of
+its 124.8px are the PARENT's padding and a flex item cannot cover it — and it
+shifts the glyphs 93.02px left at 1440 while shifting them 0.00px at 991, 767 and
+390, because `.text-block-8` is `text-align: left` at 1440 and `center` below it.
+**A pixel regression that passes three of the gate's four viewports.** The
+stretched-link `::after` ships instead: out of flow, so nothing moves, and
+`inset: 0` resolves against the tile's padding box including both 40px bands.
+
+Measured on a production build: corner hit-test `....A` -> `AAAAA` on all eight
+tiles at all four viewports, the anchors' own boxes unchanged at 6.1%-34.5%, and
+`#Residents` still 743.19px / 1322.38px. Two earlier runs of that probe reported
+false misses because `scroll-behavior: smooth` (app.css:223) meant
+`scrollIntoView` was still animating when I sampled — the failures moved around
+between runs, which is the tell I should have read faster.
+
+**The modals.** `$lib/actions/trapFocus.ts` was in the repo the whole time, with
+a docblock describing this exact case and an `enabled` option for overlays that
+are always rendered and toggled by state. The hand-rolled version moved focus in
+and never contained it, so one Tab from the close control walked onto the page
+behind an opaque 100vw/100vh overlay. It also focused inside `queueMicrotask`,
+which races Svelte's flush: the popup is `display:none` until `popupStyle` lands
+and `.focus()` inside a `display:none` ancestor is a silent no-op — no throw, no
+return value, nothing to assert on. trapFocus focuses inside rAF after layout.
+
+Also: `aria-modal="true"` on all six; the six close controls are real `<button>`s
+(they were divs whose hand-rolled handler fired on Space KEYDOWN, where a real
+button fires on keyup — press Space, change your mind, move off, and it still
+closed); backdrop-click dismissal matching `components/Modal.svelte`; focus
+restored after the outro rather than 500ms before it; and `aria-expanded`
+deleted, because it was keyed on the MODAL and two triggers open `tv_internet`,
+so opening either announced both as expanded.
+
+**Three guards, three defects the repo already had.** The style block's
+"names a source on every declaration" test caught all thirteen of my new
+declarations uncited and made me tag them `repo a11y`. That is matching rule 1
+enforced mechanically, and it worked on me within a minute of writing the CSS.
+The close-control test's own comment had claimed a `<button>` "would drag UA
+styles the reference never had" — true, and not a reason: it is eight
+declarations to zero. Corrected forward.
+
+**The pattern, for the third time today.** Slider.svelte yesterday, trapFocus
+today, and `prefersReducedMotion` declared verbatim in two slices while
+`$lib/transitions.ts:15` exports exactly it. All three were found by looking,
+none by remembering. The operator's question — "how do we fix this?" — is the
+right one, and the answer is not another paragraph in CLAUDE.md: I read that file
+at session start and still did not open `$lib/components/`. Every rule in this
+repo that actually holds has a mechanical check bolted to it. The reuse rule is
+the only one without.
+
+**Not fixed, filed instead:** `components/Modal.svelte`'s close button is 20x20
+(under the 24px target minimum) and its `<dialog>` has no accessible name;
+`LandscapeModal` never moves focus into itself; and the six popups sit outside
+the axe gate's scope entirely, so the green says nothing about them.

@@ -286,7 +286,14 @@ describe("NavyResidentLinks slice", () => {
     for (const [cls, key] of wiring) {
       const { container, unmount } = render(NavyResidentLinks, { props: { slice } });
       const trigger = container.querySelector(`a.${cls}`) as HTMLElement;
-      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+      // NO aria-expanded. It used to be `openKey === modal`, which is keyed on
+      // the MODAL and not on the trigger — and two distinct triggers open
+      // tv_internet ("Connecting cable tv?" .link-block-5 and "Plugging in
+      // internet?" .link-block-6, both in the wiring table above). Opening
+      // either announced BOTH as expanded, which is a worse lie than saying
+      // nothing. aria-haspopup="dialog" carries the affordance on its own.
+      expect(trigger.getAttribute("aria-expanded")).toBeNull();
+      expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
       trigger.click();
       await tick();
       for (const [other, selector] of Object.entries(POPUPS)) {
@@ -295,7 +302,8 @@ describe("NavyResidentLinks slice", () => {
           other === key ? "display:block;opacity:0" : "display:none;opacity:0",
         );
       }
-      expect(trigger.getAttribute("aria-expanded")).toBe("true");
+      // still absent after opening — see the note above the click
+      expect(trigger.getAttribute("aria-expanded")).toBeNull();
       unmount();
     }
   });
@@ -336,15 +344,27 @@ describe("NavyResidentLinks slice", () => {
 
   it("gives every close control a keyboard-operable role and a real label", async () => {
     // The reference's close is a bare <div data-w-id> with cursor:pointer
-    // (ref css:2507) — mouse only, and unreachable by keyboard. The rebuild
-    // keeps the div (a <button> would drag UA styles the reference never had)
-    // and adds role/tabindex/keydown. The accessible name comes from the icon's
-    // alt, which the reference ships as alt="".
+    // (ref css:2507) — mouse only, and unreachable by keyboard.
+    //
+    // This used to read "the rebuild keeps the div (a <button> would drag UA
+    // styles the reference never had) and adds role/tabindex/keydown". The
+    // parenthesis was true and not a reason: the UA box is eight declarations
+    // to zero, and they are in the style block cited as `repo a11y`. What the
+    // div cost was real — the hand-rolled handler fired on Space KEYDOWN where
+    // a real button fires on keyup, so pressing Space, changing your mind and
+    // moving off still closed the dialog. These are <button type="button"> now
+    // and the key semantics are the platform's.
     const { container } = render(NavyResidentLinks, { props: { slice } });
-    const closes = [...container.querySelectorAll('[role="button"]')];
+    const closes = [...container.querySelectorAll("button")];
     expect(closes).toHaveLength(6);
+    // The hand-rolled affordances must be GONE, not merely supplemented — a
+    // role="button" left on a real button is the kind of leftover that reads
+    // as intentional later.
+    expect(container.querySelectorAll('[role="button"]')).toHaveLength(0);
     for (const close of closes) {
-      expect(close.getAttribute("tabindex")).toBe("0");
+      expect(close.getAttribute("type")).toBe("button");
+      expect(close.getAttribute("tabindex")).toBeNull();
+      expect(close.getAttribute("onkeydown")).toBeNull();
       const icon = close.querySelector("img")!;
       expect(icon.getAttribute("alt")).toBe("Close");
       expect(icon.getAttribute("src")).toBe(CLOSE_ICON);
@@ -355,11 +375,98 @@ describe("NavyResidentLinks slice", () => {
     await vi.advanceTimersByTimeAsync(32);
     await tick();
     const popup = container.querySelector(POPUPS.food)!;
-    (popup.querySelector(".div-block-29") as HTMLElement).dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-    );
+    // A synthetic keydown used to stand in for keyboard activation, because the
+    // control was a div with a hand-rolled handler. On a real <button> jsdom
+    // does not synthesize a click from Enter — and asserting that it does would
+    // be testing the browser, not this component. The keyboard guarantee is now
+    // carried by the element type, asserted above; what is left to check here
+    // is that activating it actually closes.
+    (popup.querySelector(".div-block-29") as HTMLElement).click();
     await tick();
     expect(inlineState(popup)).toBe("display:block;opacity:0");
+  });
+
+  it("gives the whole tile a hit area, not just the label", async () => {
+    // The operator's report: "the whole box should be clickable, not just the
+    // text". Measured against matching/spec/index.html in Chromium, the anchor
+    // box IS the text box — 9.4% of the 460x124.8 tile for "Hungry?" at 1440.
+    // The reference has the same defect while lighting the WHOLE tile on hover
+    // (ref css:2363-2365), so it advertises a hit area it does not have.
+    //
+    // jsdom computes no layout, so this asserts the mechanism rather than the
+    // rect; the rect was measured in a real browser and is in the PR body.
+    // The stretched link must cover exactly the eight TILE anchors — the two
+    // inside popups (.link-block-9, .link-block-10) must NOT get one, or an
+    // invisible overlay sits on top of the popup body.
+    // The selector list spans eight lines after formatting, so match the block
+    // out of STYLE directly rather than through ruleBody's single-line lookup.
+    const after = /\.link-block::after,[\s\S]*?\.link-block-8::after\s*\{([\s\S]*?)\}/.exec(STYLE);
+    expect(after, "no stretched-link ::after block in the style block").not.toBeNull();
+    for (const cls of [
+      "link-block",
+      "link-block-2",
+      "link-block-3",
+      "link-block-4",
+      "link-block-5",
+      "link-block-6",
+      "link-block-7",
+      "link-block-8",
+    ])
+      expect(STYLE.match(new RegExp(`\\.${cls}::after`, "g")) ?? []).toHaveLength(1);
+    expect(after![1]).toMatch(/content:\s*""/);
+    expect(after![1]).toMatch(/position:\s*absolute/);
+    expect(after![1]).toMatch(/inset:\s*0/);
+    expect(STYLE).not.toMatch(/\.link-block-(9|10)::after/);
+    // `inset: 0` resolves against the nearest positioned ancestor. Without this
+    // the overlay escapes to the viewport and the tiles stop being clickable
+    // altogether — a far worse failure than the one being fixed.
+    expect(ruleBody(".div-block-9")).toMatch(/position:\s*relative/);
+    // …and the label has to outrank the overlay or the text stops selecting.
+    expect(ruleBody(".text-block-8")).toMatch(/position:\s*relative/);
+  });
+
+  it("contains focus in an open popup using the repo's own trapFocus action", async () => {
+    // NOT hand-rolled. $lib/actions/trapFocus.ts already does exactly this,
+    // including the outro-transition sequencing these 500ms fades need, and
+    // its `enabled` option exists for overlays that are always rendered and
+    // toggled by state — which is what these six are.
+    const src = SOURCE;
+    expect(src).toContain('import { trapFocus } from "$lib/actions/trapFocus"');
+    expect(src.match(/use:trapFocus=/g) ?? []).toHaveLength(6);
+    for (const key of ["electric", "laundry", "gym", "tv_internet", "ride", "food"])
+      expect(src).toContain(`use:trapFocus={{ enabled: openKey === "${key}"`);
+    // Focus containment without aria-modal tells a screen reader the background
+    // is still browsable while Tab says otherwise. They ship together.
+    const { container } = render(NavyResidentLinks, { props: { slice } });
+    const dialogs = [...container.querySelectorAll('[role="dialog"]')];
+    expect(dialogs).toHaveLength(6);
+    for (const d of dialogs) expect(d.getAttribute("aria-modal")).toBe("true");
+  });
+
+  it("closes on a backdrop click but not on a click inside the panel", async () => {
+    // Parity with components/Modal.svelte:37-39 — a visitor who learns the
+    // gesture on one dialog in this site gets it on all of them. The negative
+    // half is the one that matters: a naive handler on the root closes the
+    // popup when the visitor clicks the body text.
+    vi.useFakeTimers();
+    const { container } = render(NavyResidentLinks, { props: { slice } });
+    (container.querySelector("a.link-block-2") as HTMLElement).click();
+    await vi.advanceTimersByTimeAsync(32);
+    await tick();
+    const popup = container.querySelector(POPUPS.electric)! as HTMLElement;
+    expect(inlineState(popup)).toBe("display:block;opacity:1");
+
+    (popup.querySelector('[role="dialog"]') as HTMLElement).click();
+    await tick();
+    expect(inlineState(popup), "a click inside the panel must not close").toBe(
+      "display:block;opacity:1",
+    );
+
+    popup.click();
+    await tick();
+    expect(inlineState(popup), "a click on the backdrop must close").toBe(
+      "display:block;opacity:0",
+    );
   });
 
   it("closes on Escape", async () => {
@@ -501,9 +608,19 @@ describe("NavyResidentLinks slice", () => {
     // the IX2 action list in the reference's JS, and the reduced-motion guard is
     // a repo a11y rule the reference has no equivalent of.
     const nonCss = DECLARATIONS.filter((l) => !/\/\* ref css:\d+/.test(l));
-    expect(nonCss).toHaveLength(2);
-    expect(nonCss[0]).toContain("transition: opacity 500ms");
-    expect(nonCss[1]).toContain("transition: none");
+    expect(nonCss).toHaveLength(15);
+    // By membership, not index: the thirteen `repo a11y` declarations below sit
+    // earlier in the style block than the fade, and the original [0]/[1] form
+    // silently started asserting about the wrong two lines.
+    expect(nonCss.filter((l) => l.includes("transition: opacity 500ms"))).toHaveLength(1);
+    expect(nonCss.filter((l) => l.includes("transition: none"))).toHaveLength(1);
+    // The other thirteen are one change: the tile-sized hit area (the reference
+    // lights the whole tile on hover, ref css:2363-2365, while only the centred
+    // text is clickable) and the UA reset the six close <button>s need. Every
+    // one is tagged `repo a11y` — the count is pinned so a fourteenth cannot
+    // arrive unnoticed under cover of a category that already exists.
+    const repoA11y = nonCss.filter((l) => /\/\* repo a11y:/.test(l));
+    expect(repoA11y).toHaveLength(13);
   });
 
   it("gives the h1 a 44px line box on 32px type, left-offset and never centred", () => {
