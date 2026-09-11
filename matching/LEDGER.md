@@ -306,3 +306,51 @@ clipping and cited nothing for the arrangement, because nothing had been measure
 rest slide 0 sits at `0 + 0 = 0` either way — correct by coincidence. All four
 `Creative Lofts` regions read 0.0% before and after this fix. A carousel's defect
 lives in the frames between the ones anyone photographed, and `pinState` (Phase 6) deliberately pins to the one frame where this bug is invisible.
+
+## Phase 8 — autoplay restarts on interaction, which the reference does not (2026-09-11)
+
+**Deviation, at the operator's request.** User navigation (arrows, Left/Right
+keys, swipe) now restarts the full 3000ms delay. The reference does not.
+
+Measured on the live site rather than assumed, because the existing note in
+`NavyHeroSlider/index.svelte` said only that clicking "does NOT stop" autoplay,
+which is a different claim from whether it re-phases:
+
+    2192ms  autoplay settles on slide 2
+    4235ms  CLICK right-arrow
+    5201ms  settles on slide 4   (+966ms)
+    8211ms  settles on slide 5   (+3010ms)
+    11222ms settles on slide 6   (+3011ms)
+
+The ticks hold a flat ~3010ms cadence straight through the click — 5201, 8211
+and 11222 all sit on the phase established at 2192. So the reference lets a
+scheduled tick land under a second after a click and jump again unasked, which
+is the behaviour the operator reported.
+
+Implemented with the `autoplayEpoch` mechanism already in
+`$lib/components/Slider.svelte` rather than a new one, so the two carousels in
+this repo do not answer the same question two ways. Only user-initiated moves
+re-key; routing the interval through the same path would rebuild it on every
+tick, and there is a test for that.
+
+**Moves no pixels.** The gate photographs one settled frame with the carousel
+pinned to slide 1; timer phase is not observable in it. 20/20 unchanged.
+
+### The dot-nav decision, re-tested against the house solution
+
+`$lib/components/Slider.svelte:310` renders each dot as `h-6 min-w-6` — a 24px
+hit area with the visual dot styled separately inside. That is the standard
+answer to WCAG 2.2 target-size and it was available all along; the Phase 5 entry
+above reached its conclusion without checking it. Tested here properly:
+
+    as shipped   target 14x14  visual 14x14  pitch 20px  row 114px  FAIL insufficient size
+    padded       target 24x24  visual 14x14  pitch 20px  row 114px  FAIL partially obscured (20x24)
+
+The technique preserves the geometry exactly — row width is identical at 114px,
+so the gate would not see it — but on the reference's **20px pitch** adjacent
+24px targets overlap, and axe fails 5 of the 6 on obscuring rather than on size.
+
+So the earlier conclusion stands and its reason is now sharper: the blocker is
+the pitch (`.w-slider-dot { margin: 0 3px }` on a 14px dot, ref css:1262), not
+the size of the box. Passing requires the pitch itself to reach 24px, which
+moves pixels the gate measures. **Still the operator's call**, unchanged.

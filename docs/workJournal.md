@@ -1466,3 +1466,63 @@ precisely the frame where this defect is invisible. Pinning bought a real,
 honest measurement of everything static, and it cannot say anything about the
 frames in between. **A passing geometry gate is not a claim that a moving
 component moves correctly**, and nothing in the harness currently is.
+
+## 2026-09-11 — Autoplay restarts on interaction, and I should have read the starter first (#22)
+
+Operator: "clicking a slide should reset the autoplay timer. Did you build your
+own slider or use the implementation we already had in reddoor starter?"
+
+**I built my own, and I did not check.** `src/lib/components/Slider.svelte` is in
+this repo — 12KB, with tests, shipped from the starter — and is referenced only
+by the a11y fixtures route. It already has autoplay with pause-on-hover,
+pause-on-hidden-tab, APG focus handling, reduced-motion, loop and fade modes, and
+`autoplayEpoch`, whose comment reads "Re-key the interval on swipe navigation so
+a gesture restarts the full delay" — precisely the feature being asked for.
+
+Two things follow, and only one of them is an excuse.
+
+The excuse is real but partial: this is a pixel-matched Webflow rebuild, and the
+gate compares against a DOM of transcribed Webflow classes
+(`.w-slider-mask > .w-slide.slide-6`, arrows, `.w-slider-nav`), with CSS lifted
+from the reference stylesheet. The starter's Slider owns its own wrapper markup
+and exposes only a Snippet for slide content, so it could not have been dropped
+in without forking it. A separate component was probably the right outcome.
+
+The part that is not excused: **the outcome was right and the process was not.**
+I never opened the file, so I never saw that the logic — epoch re-keying, the
+pause states, the dot hit-area treatment — was sitting there to be copied. Two
+of those I then re-derived, one of them wrongly enough to escalate it to the
+operator as a decision.
+
+**The dot-nav deviation, re-tested.** Phase 5 declared that the reference's dot
+nav cannot pass WCAG 2.2 target-size and moved interaction to the arrows, and I
+put that to the operator as a call only they could make. The starter's answer is
+`h-6 min-w-6` — a 24px hit area wrapping a smaller visual. Tested here with the
+reference's real geometry:
+
+    as shipped   target 14x14  visual 14x14  pitch 20px  row 114px  FAIL insufficient size
+    padded       target 24x24  visual 14x14  pitch 20px  row 114px  FAIL partially obscured
+
+The conclusion survives, which is the only reason this is a footnote rather than
+a retraction: the hit area preserves geometry exactly (row width identical at
+114px) but adjacent 24px targets overlap on the reference's 20px pitch and axe
+fails 5 of 6 on obscuring. The blocker is the PITCH, not the box — a materially
+better statement of the problem than the one I gave, and one I would have had a
+day earlier by reading the component that was already here. First attempt at the
+fixture also got this wrong: negative margins collapsed the pitch to 14px and I
+nearly read the result off a row 30px narrower than the reference's.
+
+**The autoplay measurement.** The existing code comment said clicking "does NOT
+stop" the reference's autoplay — true, and not the question. Measured whether it
+re-phases: ticks at 2192, 5201, 8211, 11222ms hold a flat ~3010ms cadence
+straight through a click at 4235ms. So the reference lets a scheduled tick land
+under a second after a click and jump again unasked. This build now restarts the
+delay, which is a deliberate deviation recorded in LEDGER. The guard that matters
+is negative — at 2900ms after a click the original tick's slot has passed and
+nothing may have moved — and it fails on the old code with "expected 2 to be 1".
+
+**Worth carrying forward:** this repo has a `$lib/components/` directory of
+solved problems, and a slice that needs behaviour should be read against it
+before the behaviour gets written. The cost here was not the duplicated
+component; it was re-deriving two answers badly and taking one of them to the
+operator as a novel constraint.

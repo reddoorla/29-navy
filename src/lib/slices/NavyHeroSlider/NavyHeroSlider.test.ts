@@ -342,6 +342,58 @@ describe("NavyHeroSlider slice", () => {
       ).toBe(true);
     });
 
+    /** Index of the slide currently at the mask's left edge. */
+    const onScreen = (container: Element) => positions(container).indexOf(0);
+
+    it("restarts the full delay when the visitor navigates", async () => {
+      // DELIBERATE DEVIATION from the reference, at the operator's request.
+      // Measured on the live site: autoplay settled slide 2 at 2192ms, the right
+      // arrow was clicked at 4235ms, and ticks carried on at 5201 / 8211 /
+      // 11222ms — a flat ~3010ms cadence straight through the click. So the
+      // reference lets a scheduled tick land ~1s after a click and jump again
+      // unasked. This build restarts the delay instead.
+      //
+      // The assertion that matters is the NEGATIVE one: at 2900ms after the
+      // click the original tick's slot (3000ms from mount) has already passed,
+      // and nothing may have moved.
+      vi.useFakeTimers();
+      const container = mountSlider();
+      await vi.advanceTimersByTimeAsync(2000);
+      await tick();
+      expect(onScreen(container), "no tick yet at 2000ms").toBe(0);
+
+      (container.querySelector(".w-slider-arrow-right") as HTMLElement).click();
+      await tick();
+      expect(onScreen(container), "the click itself advances").toBe(1);
+
+      await vi.advanceTimersByTimeAsync(2900);
+      await tick();
+      expect(onScreen(container), "the tick scheduled for 3000ms must not survive the click").toBe(
+        1,
+      );
+
+      await vi.advanceTimersByTimeAsync(200);
+      await tick();
+      expect(onScreen(container), "a full delay after the click, it advances").toBe(2);
+    });
+
+    it("does not re-key the interval on its own ticks", async () => {
+      // The cheap way to implement the above is to bump the epoch inside step()
+      // itself, which also re-keys on every autoplay tick — rebuilding the
+      // interval 20 times a minute and making the cadence depend on teardown
+      // ordering. Three unattended ticks must land on a flat 3000ms grid.
+      vi.useFakeTimers();
+      const container = mountSlider();
+      for (const expected of [1, 2, 3]) {
+        await vi.advanceTimersByTimeAsync(2999);
+        await tick();
+        expect(onScreen(container), `no early tick before ${expected}`).toBe(expected - 1);
+        await vi.advanceTimersByTimeAsync(1);
+        await tick();
+        expect(onScreen(container), `tick ${expected} on the 3000ms grid`).toBe(expected);
+      }
+    });
+
     it("loops forward at the wrap instead of rewinding", async () => {
       // The measured reference behaviour, and the reason this is not just
       // `index + 1`: at the wrap the outgoing slide keeps moving LEFT while the
