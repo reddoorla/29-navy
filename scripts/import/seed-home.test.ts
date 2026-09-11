@@ -12,6 +12,7 @@ import {
   publishedImages,
   sanitizeName,
   verifyPublished,
+  comparePublished,
 } from "./seed-home.mjs";
 import { documents } from "../../src/lib/site-pages.js";
 
@@ -204,11 +205,26 @@ describe("formatReport", () => {
 });
 
 describe("verifyPublished", () => {
+  const SENT = [{ slice_type: "a" }, { slice_type: "b" }];
   const plan = [
-    { assembly: { type: "page", uid: "home" }, slices: [{ slice_type: "a" }, { slice_type: "b" }] },
+    {
+      assembly: {
+        type: "page",
+        uid: "home",
+        // The document the seeder sends is more than a slice count, and the
+        // fixture has to carry that or the verifier's new checks are never
+        // exercised by these tests at all.
+        data: { slices: SENT, meta_title: "T", meta_description: "D" },
+      },
+      slices: SENT,
+    },
   ];
   const REFS = { refs: [{ isMasterRef: true, ref: "master-ref" }] };
-  const withSlices = (n: number) => ({ results: [{ data: { slices: Array(n).fill({}) } }] });
+  const withSlices = (n: number, over = {}) => ({
+    results: [
+      { data: { slices: SENT.slice(0, n), meta_title: "T", meta_description: "D", ...over } },
+    ],
+  });
 
   const run = (pages: Array<number>, extra = {}) => {
     const urls: string[] = [];
@@ -236,7 +252,7 @@ describe("verifyPublished", () => {
   };
 
   it("passes only when the PUBLISHED ref carries the slices", async () => {
-    expect(await run([2]).result).toEqual([{ uid: "home", want: 2, got: 2 }]);
+    expect(await run([2]).result).toEqual([{ uid: "home", want: 2, got: 2, diffs: [] }]);
   });
 
   it("throws, naming both counts, when the release was staged but not published", async () => {
@@ -251,6 +267,46 @@ describe("verifyPublished", () => {
 
   it("retries, because the published ref lags the publish call", async () => {
     expect((await run([0, 0, 2]).result)[0].got).toBe(2);
+  });
+
+  it("fails when a text field the seeder wrote is absent from the published ref", async () => {
+    // THE regression. Before this, verifyPublished compared slice count and
+    // nothing else, then printed "the published ref carries what site-pages.js
+    // describes". Measured on 2026-09-11 against the real repository: the run
+    // that wrote meta_title and meta_description passed without ever reading
+    // either one back. Slice count is right here and the field is wrong, so
+    // this test fails for exactly one reason.
+    const result = verifyPublished({
+      repositoryName: "r",
+      plan,
+      attempts: 2,
+      sleep: async () => {},
+      nonce: () => "n1",
+      fetchJson: async (url: string) =>
+        url.includes("/documents/search") ? withSlices(2, { meta_title: undefined }) : REFS,
+    });
+    await expect(result).rejects.toThrow(/meta_title: live null != sent "T"/);
+  });
+
+  it("fails when the slices are published in the wrong order", async () => {
+    // Same five slices in a different order is a different page, and a count
+    // cannot see it.
+    const result = verifyPublished({
+      repositoryName: "r",
+      plan,
+      attempts: 2,
+      sleep: async () => {},
+      nonce: () => "n1",
+      fetchJson: async (url: string) =>
+        url.includes("/documents/search")
+          ? {
+              results: [
+                { data: { slices: [...SENT].reverse(), meta_title: "T", meta_description: "D" } },
+              ],
+            }
+          : REFS,
+    });
+    await expect(result).rejects.toThrow(/slices: live \[b, a\] != sent \[a, b\]/);
   });
 
   it("busts the CDN cache on every request", async () => {
@@ -330,5 +386,32 @@ describe("reusing assets Prismic already holds", () => {
     img("/29navy/assets/roof.jpg", "A roof.");
     expect(migration.created.map((c) => c.filename)).toEqual(["roof.jpg"]);
     expect(assets.size).toBe(1);
+  });
+});
+
+describe("comparePublished", () => {
+  it("is silent when the published document matches what was sent", () => {
+    const want = { slices: [{ slice_type: "a" }], meta_title: "T" };
+    expect(comparePublished(want, { slices: [{ slice_type: "a" }], meta_title: "T" })).toEqual([]);
+  });
+
+  it("does not compare image fields, because Prismic rewrites their URLs", () => {
+    // Not an oversight — an upload returns a different host, id and query
+    // string every time, so asserting on `url` would fail every single run and
+    // the check would be deleted within a day. Named here so the gap is a
+    // decision on the record rather than something a reader has to infer.
+    const want = { hero: { url: "/images/a.jpg", alt: "A" } };
+    const live = {
+      hero: { url: "https://images.prismic.io/29-navy/xyz.jpg?auto=format", alt: "A" },
+    };
+    expect(comparePublished(want, live)).toEqual([]);
+  });
+
+  it("reports a missing field and a changed field separately", () => {
+    const want = { meta_title: "T", meta_description: "D" };
+    const diffs = comparePublished(want, { meta_title: "OTHER" });
+    expect(diffs).toHaveLength(2);
+    expect(diffs.join(" ")).toContain('meta_title: live "OTHER" != sent "T"');
+    expect(diffs.join(" ")).toContain("meta_description: live null");
   });
 });

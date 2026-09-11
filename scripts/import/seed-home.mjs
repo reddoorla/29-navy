@@ -271,21 +271,66 @@ export async function verifyPublished({
         `[[at(document.type,"${p.assembly.type}")][at(my.${p.assembly.type}.uid,"${p.assembly.uid}")]]`,
       );
       const res = await fetchJson(`${api}/documents/search?ref=${master.ref}&q=${q}&_=${bust}`);
+      const live = res.results?.[0]?.data ?? {};
       last.push({
         uid: p.assembly.uid,
         want: p.slices.length,
-        got: res.results?.[0]?.data?.slices?.length ?? 0,
+        got: live.slices?.length ?? 0,
+        diffs: comparePublished(p.assembly.data ?? {}, live),
       });
     }
-    if (last.every((r) => r.got === r.want)) return last;
+    if (last.every((r) => r.got === r.want && !r.diffs.length)) return last;
     if (attempt < attempts) await pause(waitMs);
   }
 
   throw new Error(
     `published content does not match what was sent:\n` +
-      last.map((r) => `    ${r.uid}: ${r.got} slice(s) live, expected ${r.want}`).join("\n") +
+      last
+        .flatMap((r) => [
+          `    ${r.uid}: ${r.got} slice(s) live, expected ${r.want}`,
+          ...r.diffs.map((d) => `      ${d}`),
+        ])
+        .join("\n") +
       `\n  The migration release may exist but be unpublished — check Releases in Prismic.`,
   );
+}
+
+/**
+ * What the published document disagrees with, field by field.
+ *
+ * This function exists because the thing above it used to compare slice COUNT
+ * and nothing else, while printing "the published ref carries what
+ * site-pages.js describes" — a green granted by a check that could not observe
+ * most of what it was vouching for. It was measured on 2026-09-11: the meta
+ * fields had just been written, the verifier never looked at them, and it
+ * passed. Renaming the message would have been the smaller lie; this is the fix.
+ *
+ * Compared: slice types in document order, and every top-level string field.
+ * NOT compared, deliberately: anything under a slice's `primary`/`items`, and
+ * image fields anywhere. Prismic rewrites an uploaded image into its own CDN
+ * URL with its own id and query string, so `url` never round-trips and
+ * asserting on it would fail every run. `docs/workJournal.md` carries the gap;
+ * the honest move is to name it rather than let the caller infer coverage the
+ * function does not have.
+ */
+export function comparePublished(want, live) {
+  const diffs = [];
+
+  const wantTypes = (want.slices ?? []).map((s) => s.slice_type);
+  const liveTypes = (live.slices ?? []).map((s) => s.slice_type);
+  // Order, not just membership: the slice zone is document order, and two
+  // documents with the same five slices in different order render differently.
+  if (wantTypes.join(",") !== liveTypes.join(","))
+    diffs.push(`slices: live [${liveTypes.join(", ")}] != sent [${wantTypes.join(", ")}]`);
+
+  for (const [key, value] of Object.entries(want)) {
+    if (key === "slices" || typeof value !== "string") continue;
+    if (live[key] !== value)
+      diffs.push(
+        `${key}: live ${JSON.stringify(live[key] ?? null)} != sent ${JSON.stringify(value)}`,
+      );
+  }
+  return diffs;
 }
 
 async function main() {
@@ -329,7 +374,13 @@ async function main() {
     console.log(`\nseed-home · ${repositoryName} · VERIFY\n`);
     for (const r of await verifyPublished({ repositoryName, plan }))
       console.log(`  ${r.uid}: ${r.got} slice(s) live, expected ${r.want}`);
-    console.log(`\n✔ the published ref carries what site-pages.js describes.\n`);
+    // Names the scope it actually covered. A field that can only observe some
+    // of a thing must not be named after the whole thing.
+    console.log(
+      `\n✔ slice types (in order) and every top-level text field match ` +
+        `site-pages.js.\n  Image fields are not compared — Prismic rewrites ` +
+        `their URLs on upload.\n`,
+    );
     return;
   }
 

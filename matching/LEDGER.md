@@ -203,3 +203,53 @@ result by a different internal route. `.w-slider-mask` is `overflow: hidden`
 (ref css:1198), so every position outside [0, 1) slide-widths is clipped and
 cannot differ on screen. Measured cadence: reference advances every **3011ms**,
 this build every **3012ms**.
+
+## Phase 6 — the hero region was never a geometry failure (2026-09-11)
+
+`Creative Lofts` failed 34.1–37.9% at all four viewports across Phases 2–5 and
+was on its way to being declared a floor. It was neither a floor nor geometry.
+
+**Cause.** `lib/capture.mjs:42` sets `reducedMotion: "reduce"` on every capture,
+on both pages. This rebuild's hero honours that
+(`NavyHeroSlider/index.svelte:125`) and does not autoplay; Webflow's slider
+ignores the media query and keeps advancing on recursive `setTimeout`. So the
+gate photographed **this build on slide 1 and the reference on slide 5 of 6** —
+`gallery_roof1.jpg` against `gallery_29navy_interior.jpg`, per the slide order in
+ref css (`.slide-6` … `.slide-5`). Both sides were cut at y=68 by the same
+anchor, `heightDeltaFraction` was exactly **0**, and every pixel of the Location
+band below it already matched. Real arithmetic on different content, which is
+indistinguishable from a rendering defect until you look at the crop.
+
+**Not fixed by** removing the reduced-motion check. That trades an accessibility
+behaviour for a number, and the reference's failure to implement it is not a
+reason to match it.
+
+**Fixed by** `pinState` — a new `capturePage`/`page-diff` option carrying one JS
+snippet that is applied to BOTH pages from a single option object, so it cannot
+move one side without moving the other by the same rule. This page pins with
+`document.querySelectorAll('.w-slider-nav').forEach(n => n.querySelector('.w-slider-dot')?.click())`,
+which both sides answer structurally: the reference's dots are built by Webflow's
+JS at runtime, this build renders the same `.w-slider-dot` elements at
+`NavyHeroSlider/index.svelte:331`. It runs twice, before and after the freeze,
+because a slider driven through its own UI needs live timers to get to slide 1
+while a timer-written widget walks straight back out of the state it was put in
+(measured on the skill's own fixture: pinned to 0, read back at 85).
+
+**This is not a mask and not a threshold change.** The threshold is still 0.1,
+no region is excluded, and the pin is printed by `gate.sh` and by page-diff's own
+header and recorded as `meta.pinState` in `report.json` — an undisclosed pin
+would be a mask wearing a different hat. It makes the region _more_ measurable,
+not less: at slide parity a real hero defect now shows, where before the region
+was pure noise.
+
+**Result:** `Creative Lofts` 0.0% at all four viewports; **20/20**, zero floors,
+zero masks.
+
+### Correction to earlier notes
+
+Phase 5 recorded the cause as "the freeze pins looping CSS animations, and a
+`setInterval` carousel is not one." Both halves were wrong. The reference bundle
+contains **zero** `setInterval` calls — it autoplays on recursive `setTimeout`
+(12 uses in the site bundle, 8 more in jQuery) — and the operative difference was
+never the freeze's reach but the capture's own forced `reducedMotion`, which the
+two implementations answer differently. The Phase 5 entry stands as written.

@@ -131,9 +131,15 @@ run() { # tag refpath candpath sections
   # the freshness comparison below is between two ISO strings from one clock.
   local started
   started="$(node -e 'process.stdout.write(new Date().toISOString())')"
+  # The pin goes to page-diff as ONE option that reaches both captures, so it
+  # cannot move the candidate without moving the reference by the same rule.
+  # Empty for a page that declares none, and page-diff treats "" as no pin.
+  local pin
+  pin="$(node "$(dirname "$0")/harness.mjs" --pin-state "$page")"
+  if [ -n "$pin" ]; then echo "  pin-state: $pin"; fi
   node "$PD" --ref "$REF$refpath" --cand "$CAND$candpath" \
     --viewports "$MATRIX" --threshold "$THRESHOLD" \
-    --sections "$sections" --out "matching/out-$TAG-$page" \
+    --sections "$sections" --pin-state "$pin" --out "matching/out-$TAG-$page" \
     > "matching/out-$TAG-$page.log" 2>&1
   # IMMEDIATELY after the invocation. Any command in between — the echo
   # included — destroys $?.
