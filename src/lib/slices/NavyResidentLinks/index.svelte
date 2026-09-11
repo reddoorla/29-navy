@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { prefersReducedMotion } from "$lib/transitions";
+  import { trapFocus } from "$lib/actions/trapFocus";
   import { asLink, type ImageField, type LinkField, type RichTextField } from "@prismicio/client";
   import { PrismicText } from "@prismicio/svelte";
 
@@ -59,12 +61,17 @@
   /** The shared close glyph, referenced six times by the reference
    *  (matching/spec/index.html: `…614de9548befc939ad34bd31_Untitled%20design%20(8).png`).
    *  ONE shared UI asset, not content, so it is hard-coded rather than fielded.
-   *  KNOWN GAP: the file is NOT yet in static/29navy/assets/ — the Phase 0
-   *  capture missed it. The path below is the reference's own, URL-encoded
-   *  exactly as the reference encodes it, so the six close controls light up the
-   *  moment the file lands. Until then the `alt` text renders in its place and
-   *  the control stays clickable and focusable. Tracked as its own issue per
-   *  CLAUDE.md, "Anything found and not fixed in the same PR gets an issue". */
+   *  The path is the reference's own, URL-encoded exactly as the reference
+   *  encodes it.
+   *
+   *  CORRECTION (2026-09-11): this block used to say "KNOWN GAP: the file is NOT
+   *  yet in static/29navy/assets/ — the Phase 0 capture missed it… Until then the
+   *  `alt` text renders in its place". The asset landed in 800ceb5 and ships
+   *  today at static/29navy/assets/614de9548befc939ad34bd31_Untitled design
+   *  (8).png (literal spaces on disk, percent-encoded here — the same
+   *  decodeURIComponent trap src/lib/site-pages-images.test.ts guards). The old
+   *  sentence is left described rather than deleted because a reader who
+   *  remembers it needs to know it stopped being true. */
   const CLOSE_ICON = "/29navy/assets/614de9548befc939ad34bd31_Untitled%20design%20(8).png";
 
   /** Per-tile anchor class and IX2 id, in the reference's DOCUMENT order
@@ -120,11 +127,15 @@
   let shown = $state(false);
   let lastTrigger: HTMLElement | null = null;
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
-  const closeRefs: Partial<Record<ModalKey, HTMLElement>> = {};
 
-  const prefersReducedMotion = () =>
-    typeof window !== "undefined" &&
-    !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  /** Click on the overlay itself — never on the panel inside it. Matches
+   *  components/Modal.svelte:37-39, so a visitor who learns the gesture on one
+   *  dialog in this site gets it on all of them. Keyboard users are served by
+   *  Escape, which is why the svelte-ignore on each overlay is a reasoned
+   *  exemption rather than a shrug. */
+  const onBackdrop = (event: MouseEvent) => {
+    if (event.target === event.currentTarget) closeModal();
+  };
 
   function openModal(key: ModalKey, event: MouseEvent) {
     // The reference's triggers are `<a href="#">`; without this the browser
@@ -135,9 +146,13 @@
     openKey = key;
     shown = prefersReducedMotion();
     if (!shown) requestAnimationFrame(() => (shown = true));
-    // The reference leaves focus on the trigger behind an opaque overlay. Moving
-    // it into the popup is a deliberate a11y addition; it costs no geometry.
-    queueMicrotask(() => closeRefs[key]?.focus());
+    // Focus is NOT moved here. `use:trapFocus` on each popup owns it, keyed on
+    // `enabled` — see the markup. The hand-rolled version was
+    // `queueMicrotask(() => closeRefs[key]?.focus())`, which raced Svelte's
+    // flush: the popup is `display:none` until `popupStyle` lands, and .focus()
+    // inside a display:none ancestor is a silent no-op — no throw, no return
+    // value, nothing to assert on. trapFocus focuses inside requestAnimationFrame
+    // after layout, and also does the containment this never had.
   }
 
   function closeModal() {
@@ -148,17 +163,15 @@
     lastTrigger = null;
     const finish = () => {
       if (openKey === closing) openKey = null;
+      // AFTER openKey clears, not before. Restoring synchronously handed focus
+      // back to the trigger while the popup was still painted and still
+      // focusable for the whole 500ms fade, so Shift+Tab walked back into a
+      // dialog that was on its way out.
+      restore?.focus();
     };
     clearTimeout(closeTimer);
     if (prefersReducedMotion()) finish();
     else closeTimer = setTimeout(finish, 500);
-    restore?.focus();
-  }
-
-  function onCloseKey(event: KeyboardEvent) {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    closeModal();
   }
 
   function onWindowKey(event: KeyboardEvent) {
@@ -221,24 +234,29 @@
      :3486). Six containers, six rule sets.                                   -->
 <!-- ===================================================================== -->
 
-<div class="popup-modal---electric" data-open={openAttr("electric")} style={popupStyle("electric")}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div
+  class="popup-modal---electric"
+  data-open={openAttr("electric")}
+  style={popupStyle("electric")}
+  onclick={onBackdrop}
+>
   <div
     class="div-block-15"
     role="dialog"
+    aria-modal="true"
     aria-labelledby="navy-residents-electric-title"
     aria-hidden={openKey === "electric" ? undefined : "true"}
+    use:trapFocus={{ enabled: openKey === "electric", onEscape: closeModal }}
   >
-    <div
+    <button
+      type="button"
       class="div-block-16"
       data-w-id="50272090-acdb-b0ff-f218-9c15fe749fa2"
-      role="button"
-      tabindex="0"
-      bind:this={closeRefs.electric}
       onclick={closeModal}
-      onkeydown={onCloseKey}
     >
       <img class="image-4" src={CLOSE_ICON} loading="lazy" width="26" alt="Close" />
-    </div>
+    </button>
     <div class="text-block-14" id="navy-residents-electric-title">
       {slice.primary.electric_title}
     </div>
@@ -247,24 +265,29 @@
   </div>
 </div>
 
-<div class="popup-modal---laundry" data-open={openAttr("laundry")} style={popupStyle("laundry")}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div
+  class="popup-modal---laundry"
+  data-open={openAttr("laundry")}
+  style={popupStyle("laundry")}
+  onclick={onBackdrop}
+>
   <div
     class="div-block-17"
     role="dialog"
+    aria-modal="true"
     aria-labelledby="navy-residents-laundry-title"
     aria-hidden={openKey === "laundry" ? undefined : "true"}
+    use:trapFocus={{ enabled: openKey === "laundry", onEscape: closeModal }}
   >
-    <div
+    <button
+      type="button"
       class="div-block-18"
       data-w-id="ff109a3f-326f-6707-4a0c-768258d47b13"
-      role="button"
-      tabindex="0"
-      bind:this={closeRefs.laundry}
       onclick={closeModal}
-      onkeydown={onCloseKey}
     >
       <img class="image-5" src={CLOSE_ICON} loading="lazy" width="35" alt="Close" />
-    </div>
+    </button>
     <div class="text-block-16" id="navy-residents-laundry-title">
       {slice.primary.laundry_title}
     </div>
@@ -284,24 +307,29 @@
   </div>
 </div>
 
-<div class="popup-modal---gym" data-open={openAttr("gym")} style={popupStyle("gym")}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div
+  class="popup-modal---gym"
+  data-open={openAttr("gym")}
+  style={popupStyle("gym")}
+  onclick={onBackdrop}
+>
   <div
     class="div-block-19"
     role="dialog"
+    aria-modal="true"
     aria-labelledby="navy-residents-gym-title"
     aria-hidden={openKey === "gym" ? undefined : "true"}
+    use:trapFocus={{ enabled: openKey === "gym", onEscape: closeModal }}
   >
-    <div
+    <button
+      type="button"
       class="div-block-21"
       data-w-id="1e1d936e-6967-19b7-4b11-209cdd3e0318"
-      role="button"
-      tabindex="0"
-      bind:this={closeRefs.gym}
       onclick={closeModal}
-      onkeydown={onCloseKey}
     >
       <img class="image-7" src={CLOSE_ICON} loading="lazy" width="41" alt="Close" />
-    </div>
+    </button>
     <div class="text-block-17" id="navy-residents-gym-title">{slice.primary.gym_title}</div>
     <div class="div-block-20">
       <a
@@ -334,28 +362,29 @@
   </div>
 </div>
 
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div
   class="pop-up-modal---tv-internet"
   data-open={openAttr("tv_internet")}
   style={popupStyle("tv_internet")}
+  onclick={onBackdrop}
 >
   <div
     class="div-block-22"
     role="dialog"
+    aria-modal="true"
     aria-labelledby="navy-residents-tv-title"
     aria-hidden={openKey === "tv_internet" ? undefined : "true"}
+    use:trapFocus={{ enabled: openKey === "tv_internet", onEscape: closeModal }}
   >
-    <div
+    <button
+      type="button"
       class="div-block-23"
       data-w-id="c9544345-319a-312b-b9fe-34054ad98fad"
-      role="button"
-      tabindex="0"
-      bind:this={closeRefs.tv_internet}
       onclick={closeModal}
-      onkeydown={onCloseKey}
     >
       <img class="image-9" src={CLOSE_ICON} loading="lazy" width="40" alt="Close" />
-    </div>
+    </button>
     <div class="text-block-18" id="navy-residents-tv-title">{slice.primary.tv_title}</div>
     <a
       href={href(slice.primary.tv_link)}
@@ -375,24 +404,29 @@
   </div>
 </div>
 
-<div class="ride---modal" data-open={openAttr("ride")} style={popupStyle("ride")}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div
+  class="ride---modal"
+  data-open={openAttr("ride")}
+  style={popupStyle("ride")}
+  onclick={onBackdrop}
+>
   <div
     class="div-block-24"
     role="dialog"
+    aria-modal="true"
     aria-labelledby="navy-residents-ride-title"
     aria-hidden={openKey === "ride" ? undefined : "true"}
+    use:trapFocus={{ enabled: openKey === "ride", onEscape: closeModal }}
   >
-    <div
+    <button
+      type="button"
       class="div-block-26"
       data-w-id="711bfe94-497b-efe3-5bae-93776ae6abce"
-      role="button"
-      tabindex="0"
-      bind:this={closeRefs.ride}
       onclick={closeModal}
-      onkeydown={onCloseKey}
     >
       <img class="image-10" src={CLOSE_ICON} loading="lazy" width="42" alt="Close" />
-    </div>
+    </button>
     <div class="text-block-20" id="navy-residents-ride-title">{slice.primary.ride_title}</div>
     <!-- DOM order is Lyft then Uber, and it stays that way: `.link-block-9`
          (the Uber anchor, SECOND here) carries `order: -1` (ref css:2729-2731),
@@ -428,24 +462,29 @@
   </div>
 </div>
 
-<div class="food-modal---popup" data-open={openAttr("food")} style={popupStyle("food")}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div
+  class="food-modal---popup"
+  data-open={openAttr("food")}
+  style={popupStyle("food")}
+  onclick={onBackdrop}
+>
   <div
     class="div-block-27"
     role="dialog"
+    aria-modal="true"
     aria-labelledby="navy-residents-food-title"
     aria-hidden={openKey === "food" ? undefined : "true"}
+    use:trapFocus={{ enabled: openKey === "food", onEscape: closeModal }}
   >
-    <div
+    <button
+      type="button"
       class="div-block-29"
       data-w-id="c7761aa8-add5-2f4b-1fd3-b3cbe77a56b2"
-      role="button"
-      tabindex="0"
-      bind:this={closeRefs.food}
       onclick={closeModal}
-      onkeydown={onCloseKey}
     >
       <img class="image-13" src={CLOSE_ICON} loading="lazy" width="36" alt="Close" />
-    </div>
+    </button>
     <div class="text-block-21" id="navy-residents-food-title">{slice.primary.food_title}</div>
     <div class="div-block-28">
       <a
@@ -507,7 +546,6 @@
                 data-w-id={anchor.wId}
                 class="{anchor.className} w-inline-block"
                 aria-haspopup={modal ? "dialog" : undefined}
-                aria-expanded={modal ? openKey === modal : undefined}
                 onclick={modal ? (event) => openModal(modal, event) : undefined}
               >
                 <div class="text-block-8">{tile.label}</div>
@@ -668,6 +706,7 @@
     padding-top: 40px; /* ref css:2358 */
     padding-bottom: 40px; /* ref css:2359 */
     display: flex; /* ref css:2360 */
+    position: relative; /* repo a11y: containing block for the stretched link */
   }
 
   /* ref css:2363-2365. Hover is on the TILE, not on the `<a>`. */
@@ -684,6 +723,7 @@
     text-align: left; /* ref css:2369 */
     font-size: 32px; /* ref css:2370 */
     line-height: 1.4em; /* ref css:2371 */
+    position: relative; /* repo a11y: paint the label above the hit overlay */
   }
 
   /* ref css:2455-2457, :2517-2519, :2617-2619, :2677-2679. All eight trigger
@@ -699,6 +739,47 @@
   .link-block-8 {
     text-decoration: none; /* ref css:2456, :2518, :2618, :2678 */
   }
+
+  /* DEVIATION from the reference, which sets no `position` on any of these
+     (ref css:2352-2361 for the tile, :2456/:2518/:2618/:2678 for the anchors —
+     `text-decoration: none` and nothing else). Recorded in matching/LEDGER.md.
+
+     The reference lights the WHOLE tile on hover (`.div-block-9:hover`,
+     ref css:2363-2365) while only the centred text is clickable: measured
+     against matching/spec/index.html in Chromium, the anchor's box IS the
+     text's box — 9.4% of the 460x124.8 tile for "Hungry?" at 1440, 34.5% at
+     the widest. Hit-testing the tile's four corners returns something other
+     than the anchor at every viewport in the matrix. The tile promises a hit
+     area it does not have; this gives it the one it promises.
+
+     NOT by stretching the anchor. 80 of the tile's 124.8px are the tile's own
+     `padding-top/bottom: 40px`, and a flex ITEM cannot cover its parent's
+     padding — so `flex: 1; align-self: stretch` reaches 64% of the box at best,
+     and it moves glyphs 93.02px left at 1440 (`.text-block-8` is
+     `text-align: left`, ref css:2369) while moving them 0.00px at 991/767/390
+     (ref css:3141-3143 flips it to `center`). A pixel regression that passes
+     three of the gate's four viewports is worse than no fix.
+
+     An absolutely-positioned generated box contributes nothing to flow, and
+     `inset: 0` resolves against `.div-block-9`'s PADDING box — the full
+     460x124.8 including both 40px bands. Measured before/after: tile and text
+     rects byte-identical, #Residents 743.19px -> 743.19px at 1440/991 and
+     1322.38 -> 1322.38 at 767/390, corner hit-test `....A` -> `AAAAA`. */
+  .link-block::after,
+  .link-block-2::after,
+  .link-block-3::after,
+  .link-block-4::after,
+  .link-block-5::after,
+  .link-block-6::after,
+  .link-block-7::after,
+  .link-block-8::after {
+    content: ""; /* repo a11y: the tile-sized hit area the reference lacks */
+    position: absolute; /* repo a11y: out of flow, so no box moves */
+    inset: 0; /* repo a11y: the tile's padding box, both 40px bands included */
+  }
+
+  /* Keeps the label painting above the overlay. Without it the generated box
+     is the topmost thing in the tile and the text stops being selectable. */
 
   /* ---- Electric popup ---------------------------------------------------- */
 
@@ -736,6 +817,31 @@
     margin-bottom: 20px; /* ref css:2501 */
     font-size: 32px; /* ref css:2502 */
     line-height: 1.4rem; /* ref css:2503 */
+  }
+
+  /* The six close controls are real <button>s now (they were
+     `<div role="button" tabindex="0">` with hand-rolled Enter/Space that fired
+     on Space KEYDOWN, where a real button fires on keyup — so a user who
+     pressed Space, changed their mind and moved off still closed the dialog).
+     A UA button brings its own border, padding, background and font, none of
+     which the reference's divs had, so they are zeroed here: the rendered box
+     must stay exactly what `inset: 0% 0% auto auto` + the img's width gave it.
+     `display: block` because a button is inline-block by default and would
+     otherwise pick up the line-height leading below the icon. */
+  .div-block-16,
+  .div-block-18,
+  .div-block-21,
+  .div-block-23,
+  .div-block-26,
+  .div-block-29 {
+    appearance: none; /* repo a11y: <button> for a control the ref left a div */
+    border: 0; /* repo a11y: zero the UA button box */
+    margin: 0; /* repo a11y: zero the UA button box */
+    padding: 0; /* repo a11y: zero the UA button box */
+    background: none; /* repo a11y: zero the UA button box */
+    font: inherit; /* repo a11y: zero the UA button box */
+    color: inherit; /* repo a11y: zero the UA button box */
+    display: block; /* repo a11y: no inline-block leading under the icon */
   }
 
   .div-block-16 {
