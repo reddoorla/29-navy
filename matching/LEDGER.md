@@ -189,6 +189,9 @@ redrawing the dot nav at 24px, which the gate would see. Operator's call.
 
 ### The off-screen slide arrangement differs, invisibly
 
+> Superseded by 2026-09-11 — Phase 7: the arrangement was not off-screen,
+> and not invisible.
+
 The reference moves by giving every `.w-slide` the same inline
 `transform: translateX(-index × width)`, and at the wrap hands the outgoing slide
 a one-off `-n × width` so it exits left while slide 1 enters from the right —
@@ -253,3 +256,53 @@ contains **zero** `setInterval` calls — it autoplays on recursive `setTimeout`
 (12 uses in the site bundle, 8 more in jQuery) — and the operative difference was
 never the freeze's reach but the capture's own forced `reducedMotion`, which the
 two implementations answer differently. The Phase 5 entry stands as written.
+
+## Phase 7 — the slider was empty most of the time, and this file said it could not be (2026-09-11)
+
+Reported by the operator: "slider is in a rough state right now, most of the
+time it's just grey." Reproduced on production before changing anything —
+**14 of 21 one-second samples had no slide at the mask's left edge at all**, and
+the grey is `.slider`'s own `rgb(221, 221, 221)` showing through an empty mask.
+Every image decoded; no request failed.
+
+**Cause.** `.w-slide` is `display: inline-block` (measured on the reference), so
+slide _i_ already sits at _i_ slide-widths from inline flow alone. `translateX`
+adds to that position rather than replacing it, and `slideStyle` wrote
+`translateX(offset * 100%)` as though it were absolute. Rendered position was
+therefore `i + offset`. Measured in production, at rest:
+
+    positions   0  2  4  6  8  10      <- two slide-widths apart
+    after one step
+               -1  1  3  5  7   9      <- NOTHING at 0
+
+**Fixed** by subtracting the flow position — `translateX((offset - i) * 100%)`.
+One subtraction.
+
+### The correction this file owes
+
+The entry above, _"The off-screen slide arrangement differs, invisibly"_, argued
+that because `.w-slider-mask` is `overflow: hidden` (ref css:1198), "every
+position outside [0, 1) slide-widths is clipped and cannot differ on screen." The
+reasoning was sound and the premise was false: the positions were not merely
+arranged differently off-screen, the **on-screen slot was empty**. A clipped
+region cannot hide a slide that is not there.
+
+Worse, the deviation was never real. With the subtraction in place this build
+now reproduces the reference exactly, and the reference's own behaviour —
+measured on the live site, which is what should have happened when that entry
+was written — is:
+
+    at rest        all six slides carry translateX(0px); flow does the work
+    away from wrap all six share ONE transform value (-0.30, -1.33, -2.37 …)
+    at the wrap    the wrapping slide takes a one-off value, the other five share
+
+`(offset - i)` produces precisely that: `0,0,0,0,0,0` at rest, one shared value
+away from a wrap, and `4,-2,-2,-2,-2,-2` at the wrap. **What was declared a
+deviation was a defect**, and declaring it removed the pressure to check it
+against the source. Rule 1 exists for this: the entry cited ref css:1198 for the
+clipping and cited nothing for the arrangement, because nothing had been measured.
+
+**The gate could not have caught it.** It photographs one settled frame, and at
+rest slide 0 sits at `0 + 0 = 0` either way — correct by coincidence. All four
+`Creative Lofts` regions read 0.0% before and after this fix. A carousel's defect
+lives in the frames between the ones anyone photographed, and `pinState` (Phase 6) deliberately pins to the one frame where this bug is invisible.

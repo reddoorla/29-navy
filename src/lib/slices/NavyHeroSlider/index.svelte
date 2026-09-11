@@ -176,7 +176,22 @@
         ? "transition: none"
         : `transition: transform ${SLIDE_MS}ms ease`;
     const background = url ? `background-image: url("${url}"); ` : "";
-    return `${background}transform: translateX(${offset * 100}%); ${motion}`;
+    // MINUS i, and that subtraction is the whole slider.
+    //
+    // `.w-slide` is `display: inline-block` (measured on the reference), so
+    // slide i is ALREADY sitting at i slide-widths before a transform is
+    // applied — `translateX` adds to the flow position, it does not replace it.
+    // Writing `offset * 100%` therefore put slide i at i + offset. At rest
+    // offset === i, so the slides came to rest TWO slide-widths apart
+    // (measured in production: 0 2 4 6 8 10) and after one step sat at
+    // -1 1 3 5 7 9 — with nothing at 0 at all. The mask was empty and the
+    // slider's own grey background showed through it for 14 of 21 one-second
+    // samples.
+    //
+    // Subtracting the flow position makes the transform a DELTA, which is also
+    // exactly what the reference does: at rest all six of its slides carry
+    // translateX(0px), and away from a wrap all six share one value.
+    return `${background}transform: translateX(${(offset - i) * 100}%); ${motion}`;
   };
 
   /** Enter and Space, because the arrows and dots are divs with role="button" —

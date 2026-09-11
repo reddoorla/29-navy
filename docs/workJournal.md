@@ -1395,3 +1395,74 @@ without the site having to describe its own carousel to the harness. `page.clock
 was measured and does not work as documented: `install()` alone ticks with real
 time, and `pauseAt` hangs navigation whether called before or after `goto`.
 `pinState` is the workable version, not the right one.
+
+## 2026-09-11 — The hero slider was empty most of the time, one subtraction away (#21)
+
+Operator report: "slider is in a rough state right now, most of the time it's
+just grey." Reproduced on production before touching anything, because a report
+about intermittent behaviour is worth measuring rather than reasoning about:
+sampled the live page every second for twenty seconds and found **no slide at the
+mask's left edge in 14 of 21 samples**. The grey is `.slider`'s own
+`rgb(221, 221, 221)` — Webflow's default — showing through an empty mask. Every
+image decoded, no request failed, total hero payload 0.93 MB across six files. It
+was never a loading problem.
+
+**Cause, in one line.** `.w-slide` is `display: inline-block`, so slide _i_
+already sits at _i_ slide-widths from inline flow. `translateX` adds to a flow
+position; it does not replace one. `slideStyle` wrote `translateX(offset * 100%)`
+as if it were absolute, so rendered position was `i + offset`:
+
+    at rest      0  2  4  6  8 10     two slide-widths apart
+    one step    -1  1  3  5  7  9     nothing at 0 — the mask is empty
+
+Fixed with `translateX((offset - i) * 100%)`.
+
+**I reasoned my way to the wrong answer first.** Reading `step()` I traced all
+six positions by hand, confirmed exactly one slide has `offset === 0` at every
+point in the loop, and concluded the offset arithmetic was correct — and wrote
+that down. It _was_ correct. The bug was one layer below, in translating an
+offset into a screen position, and no amount of staring at `step()` would ever
+have shown it. What found it was dumping every slide's actual rect and reading
+the spacing: `0 2 4 6 8 10`, twice what it should be, which names the defect on
+sight.
+
+**The fix is not a workaround; it converges on the reference.** Measuring the
+live slider — which should have happened when this was first written — shows all
+six slides carry `translateX(0px)` at rest and share ONE transform value away
+from a wrap (`-0.30`, `-1.33`, `-2.37` sampled mid-tween), with a one-off value
+for the wrapping slide. `(offset - i)` produces exactly that: `0,0,0,0,0,0` at
+rest, one shared value in motion, `4,-2,-2,-2,-2,-2` at the wrap.
+
+**A declared deviation was hiding a defect.** `matching/LEDGER.md` carried "The
+off-screen slide arrangement differs, invisibly", arguing that
+`overflow: hidden` (ref css:1198) clips everything outside [0, 1) slide-widths so
+the arrangement "cannot differ on screen". The clipping premise was true and the
+conclusion was false — the slides were not merely arranged differently off
+screen, the on-screen slot was empty. And there was no deviation to declare: the
+build now matches the reference's mechanism exactly. Writing "this differs, and
+here is why it does not matter" removed the pressure to check whether it differed
+at all. That entry cited a stylesheet line for the clipping and cited nothing for
+the arrangement, which under matching rule 1 should have been the tell.
+
+**Why every test passed.** The motion tests read the transform value and compare
+transform values with each other — the offset domain, which was internally
+consistent and right. Not one of them asked where a slide ends up. Worse, the
+first of them recorded the correct measurement in its own comment ("every slide
+carries `translateX(0px)` and they sit at 0, 1440, 2880") and then asserted
+`[0, 1, 2, 3, 4, 5]` against the transform, contradicting the sentence directly
+above it. The comment was a note taken from the reference; the assertion was
+written from the implementation; nobody read them together. Those assertions now
+read `positions()` — `transform + index` — which is what their comments always
+meant, and a new guard asserts the carousel's one real invariant: **exactly one
+slide is on screen at every step of a full loop.** It fails on the old code with
+`step 1: positions -1 1 3 5 7 9`.
+
+**Why the gate could not have caught it, and a warning about Phase 6.** The gate
+photographs one settled frame. At rest slide 0 sits at `0 + 0 = 0` either way, so
+all four `Creative Lofts` regions read 0.0% before and after this fix — the
+number was identical across a change that took the slider from broken to
+working. Phase 6's `pinState` deliberately pins the carousel to slide 1, which is
+precisely the frame where this defect is invisible. Pinning bought a real,
+honest measurement of everything static, and it cannot say anything about the
+frames in between. **A passing geometry gate is not a claim that a moving
+component moves correctly**, and nothing in the harness currently is.
