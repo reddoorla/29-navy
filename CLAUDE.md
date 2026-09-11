@@ -137,6 +137,35 @@ Two things follow:
   `contextOptions.reducedMotion: "reduce"` on every test, which made a whole
   class of new no-JS tests vacuous while they passed.
 
+### Read the inventory before writing behaviour
+
+`docs/COMPONENTS.md` is generated from `src/lib` and lists every shared module
+with its real prop/export names. Read it before writing interactive behaviour
+into a slice — a carousel, a dialog, a disclosure, a focus trap, a reduced-motion
+check.
+
+This is not "check for existing work" restated. That instruction was already in
+this file, was read at session start, and did not stop the same mistake three
+times in two days: `Slider.svelte` was re-derived as `NavyHeroSlider`,
+`actions/trapFocus.ts` as six hand-rolled dialogs, and `transitions.ts`'s
+`prefersReducedMotion` verbatim in two slices. The instruction was never the
+missing piece — the DATA was. Nothing in this repo named `Slider.svelte` next to
+the word "carousel" until that file existed.
+
+So it is a list, not a rule, and it is deliberately not enforced by a gate. A
+check that fails in CI fires after the component is written: the hour is already
+spent, and all it saves is the merge. The index has to be read before the
+decision or it does nothing.
+
+**Reuse is often genuinely impossible here** — the geometry gate diffs slice DOM
+against transcribed Webflow markup, and a shared component owns its own markup.
+That is a reason not to reuse the component; it is never a reason not to read it.
+The logic is usually liftable when the markup is not. Declining one gets a line
+in `matching/LEDGER.md` naming the module and why — `NavyFloorPlans` has one.
+
+**Check:** `scripts/capability-index.test.ts` fails when the index is stale. That
+guard is retroactive on purpose: it protects the index, not the decision.
+
 ### Anything found and not fixed in the same PR gets an issue
 
 A code comment is not a tracker and a doc correction is not a fix. The a11y gate
@@ -169,6 +198,8 @@ session limit, a compaction, a crash — the journal entry is what survives it.
 
 | Looking for                       | Go to                                                                       |
 | --------------------------------- | --------------------------------------------------------------------------- |
+| **Behaviour that already exists** | **[docs/COMPONENTS.md](docs/COMPONENTS.md) — read before writing any**      |
+|                                   | **interactive behaviour into a slice**                                      |
 | What this stack ships             | [docs/STARTER.md](docs/STARTER.md)                                          |
 | What's still a template default   | [docs/NEW-SITE.md](docs/NEW-SITE.md)                                        |
 | A11y conventions and the axe gate | [docs/accessibility.md](docs/accessibility.md)                              |
