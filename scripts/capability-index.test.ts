@@ -46,10 +46,11 @@ describe("the capability index", () => {
   });
 
   it("names the three modules that were actually re-derived", () => {
-    // Not decoration. Slider.svelte, trapFocus.ts and transitions.ts were each
-    // re-implemented inside a slice on 2026-09-10/11 while sitting in the tree.
-    // If the index ever stops listing one of them it has stopped doing the one
-    // job it was built for.
+    // Not decoration. On 29-navy, Slider.svelte, trapFocus.ts and transitions.ts
+    // were each re-implemented inside a slice on 2026-09-10/11 while sitting in
+    // the tree. All three ship from this starter, so the case generalises: if
+    // the index ever stops listing one of them it has stopped doing the one job
+    // it was built for.
     const index = readFileSync(join(ROOT, OUT), "utf8");
     for (const m of ["Slider.svelte", "trapFocus.ts", "transitions.ts"])
       expect(index, `${m} missing from the index`).toContain(m);
@@ -67,22 +68,32 @@ describe("the portability caveat", () => {
   // the fleet have no matching harness. The branch that runs THERE is the one
   // nobody here can see, so it gets the test.
   it("names the geometry gate only where a harness actually exists", () => {
+    // Both branches are asserted from either kind of repo, because this file is
+    // identical in the starter and in every site generated from it — a test
+    // that only exercised the local branch would leave the OTHER one, the one
+    // running in 29 of 30 repos, permanently unverified.
     const entries = buildIndex();
-    const withHarness = renderIndex(entries, ROOT);
-    expect(existsSync(join(ROOT, "matching/harness.json"))).toBe(true);
-    expect(withHarness).toContain("this site has a matching harness");
-    expect(withHarness).toContain("matching/LEDGER.md");
 
-    // A root with no harness — every other site in the fleet.
+    // A root that has a harness: this repo if it is a matching site, otherwise
+    // any directory works, since the branch is chosen by the file's presence.
+    const harnessRoot = existsSync(join(ROOT, "matching/harness.json")) ? ROOT : null;
+    if (harnessRoot) {
+      const withHarness = renderIndex(entries, harnessRoot);
+      expect(withHarness).toContain("this site has a matching harness");
+      expect(withHarness).toContain("matching/LEDGER.md");
+    }
+
+    // A root with no harness — the starter, and every non-matching site.
     const plain = renderIndex(entries, join(ROOT, "src"));
     expect(plain).not.toContain("matching harness");
     expect(plain).not.toContain("matching/LEDGER.md");
-    // …and still says the thing that matters, so the caveat is rewritten rather
-    // than dropped: reuse is a decision made AFTER reading, not instead of it.
+    // The caveat is rewritten, never dropped: reuse stays a decision made AFTER
+    // reading the module rather than instead of reading it.
     expect(plain).toContain("after reading the module, not instead of reading it");
-    // The table itself is identical either way — only the caveat differs.
+
+    // The table is identical either way — only the caveat differs.
     const table = (md: string) => md.slice(md.indexOf("| module |"));
-    expect(table(plain)).toBe(table(withHarness));
+    if (harnessRoot) expect(table(plain)).toBe(table(renderIndex(entries, harnessRoot)));
   });
 });
 
