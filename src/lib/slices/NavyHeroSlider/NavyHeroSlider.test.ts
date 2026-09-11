@@ -247,21 +247,95 @@ describe("NavyHeroSlider slice", () => {
 
     const mountSlider = () => render(NavyHeroSlider, { props: { slice } }).container;
 
+    /**
+     * Where each slide actually lands, in slide-widths from the mask's left
+     * edge — which is the only thing a visitor can see.
+     *
+     * `.w-slide` is `display: inline-block` (measured on the reference), so
+     * slide i ALREADY sits at i slide-widths before any transform is applied.
+     * `translateX` then adds to that. Every other assertion in this block reads
+     * the transform value alone, which is the offset domain, and the defect
+     * that shipped lived entirely in the step from offset to screen: the
+     * transform was written as an absolute position onto an element that was
+     * already positioned, so the two compounded and slides came to rest two
+     * slide-widths apart. Measured in production: 0 2 4 6 8 10, with NOTHING at
+     * 0 for 14 of 21 one-second samples — the mask sat empty and the slider's
+     * own grey background showed through.
+     *
+     * jsdom computes no layout, so natural position cannot be read from it; it
+     * is the element's index by definition of inline-block flow, which is what
+     * the reference was measured doing.
+     */
+    const positions = (container: Element) => xs(container).map((x, i) => x + i);
+
     it("starts as plain document order, like the reference before it moves", () => {
       // Measured on the live reference at rest: every slide carries
       // translateX(0px) and they sit at 0, 1440, 2880 … — the carousel has not
       // rearranged anything yet.
-      expect(xs(mountSlider())).toEqual([0, 1, 2, 3, 4, 5]);
+      //
+      // This asserted that measurement against xs() — the TRANSFORM — and so
+      // required translateX to reproduce a position inline-block flow had
+      // already produced. The comment was right and the assertion contradicted
+      // it. Reading positions() is what the sentence above always meant.
+      expect(positions(mountSlider())).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+
+    it("keeps exactly one slide on screen through a whole loop", async () => {
+      // THE regression, and the only assertion in this block that would have
+      // caught it. Everything else here compares transform values with each
+      // other, so a model that is internally consistent and wrong about the
+      // screen passes all of them. A carousel's one invariant is that a visitor
+      // is always looking at a slide.
+      vi.useFakeTimers();
+      const container = mountSlider();
+      for (let step = 0; step <= 6; step++) {
+        const onScreen = positions(container).filter((x) => x === 0);
+        expect(onScreen, `step ${step}: positions ${positions(container).join(" ")}`).toHaveLength(
+          1,
+        );
+        await vi.advanceTimersByTimeAsync(3000);
+        await tick();
+      }
+    });
+
+    it("carries translateX(0) on every slide at rest, exactly like the reference", async () => {
+      // Measured on the live reference: at rest all six slides carry
+      // translateX(0px) and sit at 0, 1440, 2880 … from inline-block flow
+      // alone. The old assertion recorded that measurement in a comment and
+      // then asserted [0, 1, 2, 3, 4, 5] — the transform doing work the flow
+      // had already done.
+      expect(xs(mountSlider())).toEqual([0, 0, 0, 0, 0, 0]);
+    });
+
+    it("moves the strip as a unit, giving only the wrapping slide its own value", async () => {
+      // Also measured on the reference, and a consequence of the fix rather
+      // than an extra requirement: away from a wrap all six slides share one
+      // transform (-0.30, -1.33, -2.37 … sampled mid-tween on the live site),
+      // and at a wrap the slide that jumps to the far end takes a one-off value
+      // while the other five still share theirs.
+      vi.useFakeTimers();
+      const container = mountSlider();
+      await vi.advanceTimersByTimeAsync(3000);
+      await tick();
+      expect(new Set(xs(container)).size, "away from a wrap the strip moves as one").toBe(1);
+      await vi.advanceTimersByTimeAsync(3000);
+      await tick();
+      const counts = new Map<number, number>();
+      for (const x of xs(container)) counts.set(x, (counts.get(x) ?? 0) + 1);
+      expect(
+        [...counts.values()].sort((a, b) => a - b),
+        "five share, one wraps",
+      ).toEqual([1, 5]);
     });
 
     it("advances one slide every 3000ms on its own", async () => {
       vi.useFakeTimers();
       const container = mountSlider();
-      expect(xs(container)[0]).toBe(0);
+      expect(positions(container)[0]).toBe(0);
       await vi.advanceTimersByTimeAsync(3000);
       await tick();
       // Everything shifted left by one: slide 1 is now off to the left.
-      expect(xs(container)).toEqual([-1, 0, 1, 2, 3, 4]);
+      expect(positions(container)).toEqual([-1, 0, 1, 2, 3, 4]);
       expect(container.querySelectorAll(".w-slider-dot.w-active")).toHaveLength(1);
       expect(
         [...container.querySelectorAll(".w-slider-dot")][1]!.classList.contains("w-active"),
@@ -279,7 +353,7 @@ describe("NavyHeroSlider slice", () => {
         await vi.advanceTimersByTimeAsync(3000);
         await tick();
       }
-      const after = xs(container);
+      const after = positions(container);
       // Back on slide 1, with the last slide parked just off to the LEFT.
       expect(after[0]).toBe(0);
       expect(Math.min(...after)).toBe(-1);
@@ -383,7 +457,9 @@ describe("NavyHeroSlider slice", () => {
         const container = mountSlider();
         await vi.advanceTimersByTimeAsync(12000);
         await tick();
-        expect(xs(container)).toEqual([0, 1, 2, 3, 4, 5]);
+        // Nothing moved — which is a statement about where the slides ARE, so
+        // it reads positions rather than transform values.
+        expect(positions(container)).toEqual([0, 1, 2, 3, 4, 5]);
         expect(container.querySelector(".w-slide")!.getAttribute("style")).toContain(
           "transition: none",
         );
