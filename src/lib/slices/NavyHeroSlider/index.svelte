@@ -152,11 +152,36 @@
     else teleported = [];
   }
 
+  /** Bumped by every user-initiated move; the autoplay effect reads it, so a
+   *  bump tears the interval down and starts a fresh full delay. Same mechanism
+   *  as `autoplayEpoch` in $lib/components/Slider.svelte, deliberately, so the
+   *  two carousels in this repo do not drift into two different answers. */
+  let autoplayEpoch = $state(0);
+
+  /** Navigation the visitor asked for, as opposed to a tick. Only this restarts
+   *  the delay — routing the interval through it would re-key the effect on
+   *  every tick and rebuild the interval 20 times a minute for no reason. */
+  function stepByUser(delta: number) {
+    step(delta);
+    autoplayEpoch++;
+  }
+
   // Autoplay. `data-autoplay-limit="0"` is unlimited, and clicking a dot on the
   // reference does NOT stop it — measured: after jumping to slide 6 by hand, the
   // timer still wrapped to slide 1 on its own. So nothing here cancels it.
+  //
+  // DELIBERATE DEVIATION: the reference does not restart its delay on
+  // interaction either, and that is the half this build does not copy. Measured
+  // on the live site — autoplay settled slide 2 at 2192ms, the right arrow was
+  // clicked at 4235ms, and the ticks carried on at 5201 / 8211 / 11222ms, a flat
+  // ~3010ms cadence straight through the click. The visible result is that
+  // clicking an arrow can be followed ~1s later by an unrequested jump. Recorded
+  // in matching/LEDGER.md; it moves no pixels in any frame the gate photographs.
   $effect(() => {
     if (count < 2 || prefersReducedMotion()) return;
+    // Re-key on user navigation so a click restarts the full delay rather than
+    // racing whatever is left of the in-flight one.
+    void autoplayEpoch;
     // `step` reads `index`/`offsets` inside the callback, which runs after this
     // effect has finished collecting dependencies — so the interval is created
     // once per slide count, not once per slide change.
@@ -211,7 +236,7 @@
   const onRegionKey = (event: KeyboardEvent) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    step(event.key === "ArrowRight" ? 1 : -1);
+    stepByUser(event.key === "ArrowRight" ? 1 : -1);
   };
 
   const SWIPE_PX = 40;
@@ -223,7 +248,7 @@
     if (swipeFrom === null) return;
     const dx = event.clientX - swipeFrom;
     swipeFrom = null;
-    if (Math.abs(dx) >= SWIPE_PX) step(dx < 0 ? 1 : -1);
+    if (Math.abs(dx) >= SWIPE_PX) stepByUser(dx < 0 ? 1 : -1);
   };
 </script>
 
@@ -300,8 +325,8 @@
       tabindex="0"
       aria-label="previous slide"
       aria-controls="w-slider-mask-0"
-      onclick={() => step(-1)}
-      onkeydown={onActivate(() => step(-1))}
+      onclick={() => stepByUser(-1)}
+      onkeydown={onActivate(() => stepByUser(-1))}
     >
       <!-- The chevron is an icon-font glyph in the Unicode private use area
            (U+E601, ref css:195). aria-hidden keeps a screen reader from
@@ -314,8 +339,8 @@
       tabindex="0"
       aria-label="next slide"
       aria-controls="w-slider-mask-0"
-      onclick={() => step(1)}
-      onkeydown={onActivate(() => step(1))}
+      onclick={() => stepByUser(1)}
+      onkeydown={onActivate(() => stepByUser(1))}
     >
       <div class="w-icon-slider-right" aria-hidden="true"></div>
     </div>
