@@ -1199,3 +1199,71 @@ test names it), the close transition set back to the opening curve, the srcset
 dropped from the floor-plan warm-up. All three red, restored green.
 
 `pnpm verify`: **56 files, 486 tests, 4 smoke, exit 0.**
+
+## 2026-09-10 — Phase 5: the slider moves, and the gate says exactly what it said before
+
+The hero carousel autoplays, loops, takes arrows, keys and swipes. Gate before
+**16/20**, gate after **16/20**. Both numbers are worth having.
+
+**How the reference moves, measured rather than assumed.** It does not translate
+the mask and it does not reorder the DOM. Each `.w-slide` carries its own inline
+`transform: translateX(...)` with an inline `transition: transform 0.5s ease`
+that is absent at rest — computed `all 0s` until the first move. Everything else
+came off the element itself: `data-delay="3000"`, `data-duration="500"`,
+`data-easing="ease"`, `data-infinite="true"`, `data-hide-arrows="false"`,
+`data-disable-swipe="false"`.
+
+The wrap was the part worth measuring. The obvious implementation — index + 1,
+modulo — rewinds through five slides at the end, which is visibly wrong. The
+reference instead hands the outgoing slide a one-off transform so it keeps
+travelling left while slide 1 arrives from the right. In slide-widths:
+
+    on slide 6   -5 -4 -3 -2 -1  0
+    after wrap    0  1  2  3  4 -1
+
+Found by sampling the computed transform every 50ms through the wrap: it jumped
+to **+1368** — positive — and eased to 0, which is nothing like a rewind. This
+build keeps a per-slide offset instead of the reference's history-dependent
+arrangement; `.w-slider-mask` is `overflow: hidden` (ref css:1198) so everything
+outside one slide-width is clipped and the two cannot differ on screen. Measured
+cadence: reference **3011ms**, this build **3012ms**.
+
+**The a11y gate caught something real, and it is a genuine conflict.** Giving the
+dots the reference's own runtime `role="button"` and `tabindex="0"` turned six
+indicators into six interactive controls, and axe failed the build on
+`target-size` — WCAG 2.2 AA 2.5.8, serious, six nodes. The dots are `1em` = 14px
+with `margin: 0 3px` (ref css:1262): 14px targets on a 20px pitch, where the rule
+wants 24 of either. Neither the size nor the spacing exemption can be met without
+moving pixels the geometry gate measures. **The reference cannot pass this rule
+as drawn.** Interaction moved to the arrows, which are large enough and carry the
+reference's runtime `role`/`tabindex`/`aria-label`/`aria-controls`; Left and Right
+work anywhere in the carousel. It costs click-a-dot-to-jump, and it is in
+LEDGER.md as an operator decision rather than a thing I quietly chose.
+
+**A bug I wrote and my own test caught.** Moving the background into a quoted
+`style="..."` attribute alongside `{...}` expressions rendered
+`url("&quot;…&quot;")` — Svelte does not decode an entity written inside a
+template string, so the quotes reached the CSS as literal text and every slide
+background stopped loading. The whole style is built in one function now. The
+test that failed was the reduced-motion one, which was looking at the style
+attribute for an unrelated reason; it printed the broken URL and the bug was
+obvious. Two existing tests also had to change — one looked for
+`<div class="w-slider-mask">` before it gained an id, the other asserted bare
+slides carry no `style` attribute at all, which stopped being true the moment
+slides carry a transform. Both intents survived; only their expression moved.
+
+**Why the gate did not improve.** Two of the four exits offered in LEDGER.md have
+now happened — the harness learned to freeze animation, and the autoplay exists —
+and `Creative Lofts` still fails at 34.1–37.9%. That is the expected result and
+it sharpens the diagnosis: the freeze pins looping **CSS** animations, and a
+Webflow slider on `setInterval` is not one. `getAnimations()` cannot see it, so
+freezing stops it moving without making two captures agree on where it stopped.
+Both sides now move and both are photographed at an independently-chosen slide.
+The remaining fix is a faked page clock; what I learned attempting it is on
+reddoorla/claude-skills#2.
+
+Everything else on the page still passes, most at **0.0%** — `Hover or click on
+a floor`, `Paying rent online?` and `29 Navy Street` are 0.0/0.0 at all four
+viewports, and the four anchors resolve to identical Y on both sides.
+
+`pnpm verify`: **56 files, 494 tests, 4 smoke, 0 axe violations, exit 0.**

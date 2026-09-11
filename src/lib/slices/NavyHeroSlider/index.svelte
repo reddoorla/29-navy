@@ -71,6 +71,145 @@
   const logoAlt = $derived(slice.primary.logo?.alt ?? REF_LOGO_ALT);
   const aerialUrl = $derived(slice.primary.mobile_location_image?.url ?? REF_AERIAL);
   const aerialAlt = $derived(slice.primary.mobile_location_image?.alt ?? REF_AERIAL_ALT);
+
+  /* ---- Motion -------------------------------------------------------------
+   *
+   * Every number here is read off the reference's own slider element in
+   * matching/spec/index.html:
+   *
+   *     data-delay="3000"  data-duration="500"  data-easing="ease"
+   *     data-animation="slide"  data-autoplay="true"  data-infinite="true"
+   *     data-hide-arrows="false"  data-disable-swipe="false"
+   *
+   * HOW THE REFERENCE MOVES, measured on the live site at 1440 rather than
+   * assumed: it does NOT translate the mask and it does NOT reorder the DOM.
+   * Each `.w-slide` carries its own inline `transform: translateX(...)`, with an
+   * inline `transition: transform 0.5s ease` that is absent at rest (computed
+   * `all 0s` until the first move). At the wrap, slide 6 keeps animating left
+   * while slide 1 comes in from the RIGHT — the loop runs forward, it does not
+   * rewind. Measured through the wrap, in slide-widths:
+   *
+   *     on slide 6   -5 -4 -3 -2 -1  0
+   *     after wrap    0  1  2  3  4 -1     <- the last slide moved to the LEFT
+   *
+   * WHERE THIS DEPARTS. The reference gets there by giving the wrapping slide a
+   * one-off transform of -n*width while the rest share one value, so its
+   * off-screen arrangement depends on history. This keeps a per-slide offset
+   * instead, which is the standard carousel form and reaches the same visible
+   * result: `.w-slider-mask` is `overflow: hidden` (ref css:1198), so every
+   * position outside [0, 1) slide-widths is clipped and cannot differ on screen.
+   * Recorded in matching/LEDGER.md. */
+  const SLIDE_MS = 500; // ref index.html data-duration
+  const DELAY_MS = 3000; // ref index.html data-delay
+
+  const count = $derived(slides.length);
+  /** Each slide's position in slide-widths. 0 is on screen, -1 is just off to
+   *  the left, 1+ is queued to the right. Starts as the plain document order,
+   *  which is what the reference renders before it has moved at all. */
+  let offsets = $state<number[]>([]);
+  /** Slides that teleported this frame and must not animate getting there. */
+  let teleported = $state<number[]>([]);
+  let index = $state(0);
+
+  $effect(() => {
+    // Re-seed if the authored slide count changes.
+    if (offsets.length !== count) {
+      offsets = Array.from({ length: count }, (_, i) => i);
+      teleported = [];
+      index = 0;
+    }
+  });
+
+  const prefersReducedMotion = () =>
+    typeof window !== "undefined" &&
+    !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+  /** Step the carousel by `delta` slides. Everything shifts by one; whichever
+   *  slide falls off the near side jumps to the far end, which is the only move
+   *  that must not be animated — it crosses the whole strip. */
+  function step(delta: number) {
+    if (count < 2) return;
+    const next = [...offsets];
+    const jumped: number[] = [];
+    for (let i = 0; i < count; i++) {
+      next[i] -= delta;
+      if (next[i] < -1) {
+        next[i] += count;
+        jumped.push(i);
+      } else if (next[i] > count - 2) {
+        next[i] -= count;
+        jumped.push(i);
+      }
+    }
+    teleported = jumped;
+    offsets = next;
+    index = (((index + delta) % count) + count) % count;
+    // Two frames, not one: the first commits the teleport with no transition,
+    // the second restores it. Restoring in the same frame would let the browser
+    // coalesce both style writes and animate the jump after all.
+    if (typeof requestAnimationFrame === "function")
+      requestAnimationFrame(() => requestAnimationFrame(() => (teleported = [])));
+    else teleported = [];
+  }
+
+  // Autoplay. `data-autoplay-limit="0"` is unlimited, and clicking a dot on the
+  // reference does NOT stop it — measured: after jumping to slide 6 by hand, the
+  // timer still wrapped to slide 1 on its own. So nothing here cancels it.
+  $effect(() => {
+    if (count < 2 || prefersReducedMotion()) return;
+    // `step` reads `index`/`offsets` inside the callback, which runs after this
+    // effect has finished collecting dependencies — so the interval is created
+    // once per slide count, not once per slide change.
+    const id = setInterval(() => step(1), DELAY_MS);
+    return () => clearInterval(id);
+  });
+
+  /** The slide's whole inline style, background included, built in ONE
+   *  expression. It used to be two — a quoted attribute mixing text with
+   *  `{...}` — and that renders `url("&quot;…&quot;")`: Svelte does not decode
+   *  an entity written inside a template string, so the quotes reached the CSS
+   *  as literal text and the background silently stopped loading. */
+  const slideStyle = (i: number, url?: string) => {
+    const offset = offsets[i] ?? i;
+    const motion =
+      teleported.includes(i) || prefersReducedMotion()
+        ? "transition: none"
+        : `transition: transform ${SLIDE_MS}ms ease`;
+    const background = url ? `background-image: url("${url}"); ` : "";
+    return `${background}transform: translateX(${offset * 100}%); ${motion}`;
+  };
+
+  /** Enter and Space, because the arrows and dots are divs with role="button" —
+   *  which is what the reference's own runtime DOM gives them. */
+  const onActivate = (fn: () => void) => (event: KeyboardEvent) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    fn();
+  };
+
+  // Swipe: `data-disable-swipe="false"`. Pointer events cover touch, pen and
+  // mouse drag in one path. 40px is a deliberate floor — below about 30px a
+  // tap on a dot registers as a swipe on the way past.
+  /** Left/Right anywhere inside the carousel, because the dots are indicators
+   *  rather than controls (see the markup) and the arrows alone would make
+   *  reaching slide 5 four tab-stops of clicking. */
+  const onRegionKey = (event: KeyboardEvent) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    step(event.key === "ArrowRight" ? 1 : -1);
+  };
+
+  const SWIPE_PX = 40;
+  let swipeFrom: number | null = null;
+  const onPointerDown = (event: PointerEvent) => {
+    swipeFrom = event.clientX;
+  };
+  const onPointerUp = (event: PointerEvent) => {
+    if (swipeFrom === null) return;
+    const dx = event.clientX - swipeFrom;
+    swipeFrom = null;
+    if (Math.abs(dx) >= SWIPE_PX) step(dx < 0 ? 1 : -1);
+  };
 </script>
 
 <!-- Reference subtree, matching/spec/index.html chars 2663..4701:
@@ -106,6 +245,12 @@
     data-nav-spacing="3"
     data-duration="500"
     data-infinite="true"
+    role="region"
+    aria-label="carousel"
+    onpointerdown={onPointerDown}
+    onpointerup={onPointerUp}
+    onpointercancel={() => (swipeFrom = null)}
+    onkeydown={onRegionKey}
   >
     <div class="_29-navy-logo-hero">
       <!-- width="143" is a presentation ATTRIBUTE, and it is the only thing
@@ -133,17 +278,46 @@
          whitespace, and NavyHeroSlider.test.ts fails the moment a text node
          carrying characters appears in here. -->
     <!-- prettier-ignore -->
-    <div class="w-slider-mask">{#each slides as slide, i (i)}<div class="{slide.cls} w-slide" style={slide.url ? `background-image: url("${slide.url}")` : undefined} role={slide.alt ? "img" : undefined} aria-label={slide.alt || undefined}></div>{/each}</div>
-    <div class="left-arrow w-slider-arrow-left">
+    <div class="w-slider-mask" id="w-slider-mask-0">{#each slides as slide, i (i)}<div class="{slide.cls} w-slide" style={slideStyle(i, slide.url)} role={slide.alt ? "img" : undefined} aria-label={slide.alt || undefined} aria-hidden={i === index ? undefined : "true"}></div>{/each}</div>
+    <div
+      class="left-arrow w-slider-arrow-left"
+      role="button"
+      tabindex="0"
+      aria-label="previous slide"
+      aria-controls="w-slider-mask-0"
+      onclick={() => step(-1)}
+      onkeydown={onActivate(() => step(-1))}
+    >
       <!-- The chevron is an icon-font glyph in the Unicode private use area
            (U+E601, ref css:195). aria-hidden keeps a screen reader from
            announcing an unassigned code point; it changes no geometry. -->
       <div class="w-icon-slider-left" aria-hidden="true"></div>
     </div>
-    <div class="right-arrow w-slider-arrow-right">
+    <div
+      class="right-arrow w-slider-arrow-right"
+      role="button"
+      tabindex="0"
+      aria-label="next slide"
+      aria-controls="w-slider-mask-0"
+      onclick={() => step(1)}
+      onkeydown={onActivate(() => step(1))}
+    >
       <div class="w-icon-slider-right" aria-hidden="true"></div>
     </div>
-    <!-- .slide-nav is EMPTY in the reference's static HTML; Webflow's slider JS
+    <!-- INDICATORS, NOT CONTROLS, and that is a deliberate deviation. The
+         reference's runtime DOM gives every dot role="button", tabindex="0" and
+         aria-label="Show slide N of 6", and they are clickable. Reproducing that
+         fails this repo's axe gate on `target-size` (WCAG 2.2 AA, 2.5.8): the
+         dots are `1em` = 14px with `margin: 0 3px` (ref css:1262), so they are
+         14px across on a 20px pitch where the rule wants 24 of either. Neither
+         the size nor the spacing exemption can be met without moving pixels the
+         gate measures, so the reference cannot pass this rule as drawn.
+         Interaction lives on the arrows instead, which are large enough and
+         carry role/tabindex/aria-label/aria-controls exactly as the reference's
+         runtime does. Recorded in matching/LEDGER.md; reversing it is an
+         operator call, and it costs the click-to-slide-N affordance.
+
+         .slide-nav is EMPTY in the reference's static HTML; Webflow's slider JS
          builds six .w-slider-dot divs into it at runtime, the current one also
          carrying .w-active. The gate measures the reference WITH its JS running,
          so the dots are part of what is being matched — they are server-rendered
@@ -154,7 +328,7 @@
          affordance that does nothing. -->
     <div class="slide-nav w-slider-nav w-shadow w-round">
       {#each slides as _slide, i (i)}
-        <div class="w-slider-dot" class:w-active={i === 0}></div>
+        <div class="w-slider-dot" class:w-active={i === index}></div>
       {/each}
     </div>
   </div>
