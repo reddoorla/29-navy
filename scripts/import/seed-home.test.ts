@@ -9,6 +9,8 @@ import {
   buildPlan,
   createImageResolver,
   formatReport,
+  publishedImages,
+  sanitizeName,
   verifyPublished,
 } from "./seed-home.mjs";
 import { documents } from "../../src/lib/site-pages.js";
@@ -264,5 +266,69 @@ describe("verifyPublished", () => {
     // A different nonce on the second attempt, or the retry re-reads the first
     // attempt's cached response.
     expect(new Set(urls.map((u) => u.match(/_=(n\d+)/)![1])).size).toBeGreaterThan(1);
+  });
+});
+
+describe("reusing assets Prismic already holds", () => {
+  // @prismicio/client's migrateCreateAssets uploads EVERY asset a migration
+  // registers — there is no id check — so without this a second seed leaves a
+  // duplicate of all 24 images in the media library, and deleting those is
+  // manual. Measured: the first run of this uploaded 24; with reuse, 0.
+  const field = (id: string, original: string) => ({
+    id,
+    dimensions: { width: 10, height: 10 },
+    url: `https://images.prismic.io/29-navy/${id}_${original}?auto=format,compress`,
+  });
+
+  it("strips the Prismic id prefix using the id, not the first underscore", () => {
+    // The id CONTAINS an underscore ("4uIPMTuS_qroVXjo"). Cutting at the first
+    // one matched 17 of 24 published images and silently re-uploaded the rest.
+    const map = publishedImages({
+      a: field("4uIPMTuS_qroVXjo", "68a8b03886756d39d580f327_29-navy-logo-black.jpg"),
+      b: field("YX7QPp8nibm5yetD", "614de02ec8febc5e1427ffc8_gallery_roof1.jpg"),
+    });
+    expect([...map.keys()].sort()).toEqual([
+      "614de02ec8febc5e1427ffc8_gallery_roof1.jpg",
+      "68a8b03886756d39d580f327_29-navy-logo-black.jpg",
+    ]);
+  });
+
+  it("matches Prismic's own filename mangling", () => {
+    // "Untitled design (16).png" is stored as "Untitleddesign-16-.png".
+    expect(sanitizeName("Untitled design (16).png")).toBe("Untitleddesign-16-.png");
+  });
+
+  it("finds a published image nested anywhere in the document", () => {
+    const map = publishedImages({
+      slices: [{ primary: { group: [{ image: field("abc", "x.png") }] } }],
+    });
+    expect(map.has("x.png")).toBe(true);
+  });
+
+  it("returns the published field instead of registering an upload", () => {
+    const migration = fakeMigration();
+    const published = publishedImages({ a: field("abc_def", "roof.jpg") });
+    const { img, assets, reused } = createImageResolver({
+      migration,
+      published,
+      readFile: stubBytes,
+    });
+    const got = img("/29navy/assets/roof.jpg", "A roof.");
+    expect(got).toBe(published.get("roof.jpg"));
+    expect(migration.created, "an already-published image was uploaded again").toEqual([]);
+    expect(assets.size).toBe(0);
+    expect(reused.size).toBe(1);
+  });
+
+  it("still uploads an image Prismic has never seen", () => {
+    const migration = fakeMigration();
+    const { img, assets } = createImageResolver({
+      migration,
+      published: publishedImages({ a: field("abc", "other.jpg") }),
+      readFile: stubBytes,
+    });
+    img("/29navy/assets/roof.jpg", "A roof.");
+    expect(migration.created.map((c) => c.filename)).toEqual(["roof.jpg"]);
+    expect(assets.size).toBe(1);
   });
 });
