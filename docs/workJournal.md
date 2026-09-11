@@ -1313,3 +1313,85 @@ writes to live systems, which is the correct call for a CMS write. The change is
 committed and the dry run is clean; one command lands it.
 
 `pnpm verify`: **56 files, 491 tests, 4 smoke, exit 0.**
+
+## 2026-09-11 — The hero region was never geometry, and the verifier was vouching for fields it never read (#20, reddoorla/claude-skills#4)
+
+Started from `--apply` finally being run by the operator. Confirmed the meta
+fields are live — `meta_title` and `meta_description` both exactly as authored,
+`last_publication_date` 2026-09-11T05:07:36Z — by reading the published ref
+directly rather than trusting the exit code.
+
+**The seeder's own verifier was overclaiming.** `--verify` printed "the
+published ref carries what site-pages.js describes" while comparing slice
+**count** and nothing else. It had just been run over a write whose entire
+purpose was two text fields, and it passed without reading either. This is the
+`turnstile: true` shape from CLAUDE.md, in code merged the day before: a green
+granted by a check that cannot observe most of what it vouches for. `--verify`
+now compares slice types in document order and every top-level string field, and
+the success line names that scope instead of the whole document. Image fields are
+excluded deliberately and the reason is in the code: Prismic rewrites an uploaded
+image's URL, so `url` never round-trips and an assertion on it would fail every
+run.
+
+**`next.mjs` prescribed a tool this harness has never installed.** Rule 5 makes
+every round run `node matching/next.mjs`, and its output names
+`probe-anchor-parity.mjs` as the first thing to do before treating a failure as
+geometry. The file does not exist here; it exists in `beachfront-dentistry`,
+whose 214-file `matching/` the harness was ported from. Second instance of the
+same class as the `prismic-seed` references (reddoor-maintenance#763): a command
+written down without checking it runs. Ported the probe rather than deleting the
+line, because its answer was needed.
+
+**The probe then produced a false positive, and it was nearly convincing.** It
+reported `Creative Lofts` cutting on non-comparable elements at every viewport —
+`<div class="section-2">` h=900 on live against `<main class="flex-1">` h=4106
+here, a 4.6× box difference — and concluded every region score below it was
+suspect. It was wrong twice. The probe selects over `body *`; `lib/capture.mjs`,
+which does the real cutting, uses a fixed tag list that **does not contain
+`main`**. And `regionsFromAnchors` cuts on the anchor's top **Y**, not its box:
+both sides were at y=68. So the gate had never made the comparison the probe was
+alarmed about. The probe now uses capture.mjs's exact selector and flags on y
+divergence, with the height ratio demoted to context. A probe that models the
+thing it audits differently from the thing itself is worse than no probe.
+
+**The real cause of `Creative Lofts`, after five phases of it failing 34–38%.**
+`capture.mjs:42` sets `reducedMotion: "reduce"` on every capture. This build's
+hero honours that and does not autoplay; Webflow's slider ignores the media query
+and keeps advancing. The gate was photographing this build on slide 1 and the
+reference on slide 5 of 6 — `gallery_roof1.jpg` against
+`gallery_29navy_interior.jpg`. `heightDeltaFraction` was exactly 0, the anchors
+were identical, and the Location band immediately below matched pixel for pixel.
+Everything measurable said "the geometry is right", and it was.
+
+The evidence that settled it was the fail crop, which shows a kitchen on the left
+and a rooftop in the middle. That image had been sitting in
+`matching/out-phase5b-home/` for a phase and a half. **Four viewports of
+consistent arithmetic got more attention than the picture of the thing failing.**
+
+Fixed with `pinState` in the shared skill — one snippet applied to both pages
+from a single option object, disclosed by `gate.sh`, by page-diff's header and in
+`report.json`. `Creative Lofts` went to **0.0% at all four viewports**;
+**20/20**, zero floors, zero masks, threshold still 0.1.
+
+**Belief corrected on contact.** Phase 5 recorded the cause as "the freeze pins
+looping CSS animations, and a `setInterval` carousel is not one". Both halves
+were wrong: the reference bundle has **zero** `setInterval` calls and autoplays
+on recursive `setTimeout`, and the operative difference was never the freeze's
+reach but the capture's own forced reduced-motion, which the two implementations
+answer differently. That belief is also why a faked page clock looked like the
+only exit and the region looked like a floor. It was a one-line config change
+away from passing the whole time.
+
+**Honest accounting.** The gate did not move because of anything drawn or
+restyled this session. Every one of the 20 regions was already correct; the
+measurement was reading two different pages. The slider motion work in #18 and
+the preload/modal work in #17 were both real, but neither moved this number, and
+anyone reading the score jump as evidence that they did would over-invest in
+exactly the wrong place.
+
+**Not fixed.** A faked page clock (reddoorla/claude-skills#2) remains the better
+answer than naming an element per page — it would pin any timer-driven widget
+without the site having to describe its own carousel to the harness. `page.clock`
+was measured and does not work as documented: `install()` alone ticks with real
+time, and `pauseAt` hangs navigation whether called before or after `goto`.
+`pinState` is the workable version, not the right one.

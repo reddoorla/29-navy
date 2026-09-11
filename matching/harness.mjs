@@ -30,6 +30,11 @@
 //   node matching/harness.mjs --env        shell-safe KEY='value' lines
 //   node matching/harness.mjs --table      key<TAB>ref<TAB>cand<TAB>anchors
 //   node matching/harness.mjs --check-ref  the D11 preflight; exit 2 on failure
+//   node matching/harness.mjs --pin-state <page>
+//                                         the page's stateful-widget pin, or
+//                                         empty. A page with no pin prints
+//                                         nothing and exits 0, so gate.sh can
+//                                         use it unconditionally.
 //   node matching/harness.mjs --check-run <page> <out-dir> <startedAt-iso>
 //                                         did THIS run leave a countable report?
 //                                         exit 2 when it did not
@@ -376,6 +381,16 @@ if (isMain()) {
     for (const [k, v] of pairs) console.log(`${k}=${q(v)}`);
   } else if (mode === "--table") {
     for (const p of PAGES) console.log([p.key, p.ref, p.cand, p.anchors.join(",")].join("\t"));
+  } else if (mode === "--pin-state") {
+    // Deliberately NOT a fifth --table column: the table is read by a
+    // `while IFS=$'\t' read` loop, and a pin is arbitrary JS that may contain
+    // a tab. Its own flag keeps the table contract intact.
+    const key = process.argv[3];
+    if (!key || !byKey[key]) {
+      console.error("usage: harness.mjs --pin-state <page>");
+      process.exit(2);
+    }
+    process.stdout.write(byKey[key].pinState ?? "");
   } else if (mode === "--check-ref") {
     const r = await checkRef();
     console.log(`${r.ok ? "REF OK" : "REF REFUSED"} — ${r.why}`);
@@ -392,7 +407,9 @@ if (isMain()) {
     console.log(`${r.ok ? "RUN OK" : "NO RUN"} — ${r.why}`);
     process.exit(r.ok ? 0 : 2);
   } else {
-    console.error("usage: harness.mjs --env | --table | --check-ref | --check-run");
+    console.error(
+      "usage: harness.mjs --env | --table | --pin-state | --check-ref | --check-run",
+    );
     process.exit(2);
   }
 }

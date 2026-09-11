@@ -20,7 +20,8 @@
         "29 Navy Street"
       ],
       "spec": "home",
-      "group": "nav"
+      "group": "nav",
+      "pinState": "document.querySelectorAll('.w-slider-nav').forEach(n => n.querySelector('.w-slider-dot')?.click())"
     }
   }
 }
