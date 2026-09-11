@@ -8,8 +8,27 @@ build
 .env.*
 !.env.example
 
-# Local agent config — operator-specific, must not ship with the template
-.claude/
+# Local agent config — operator-specific, must not ship with the template.
+#
+# The exception below is deliberate but currently INERT, and saying so here is
+# the point: `~/.config/git/ignore` on the maintainer's machine carries
+# `**/.claude/`, which wins, so `.claude/settings.json` still cannot be added
+# without `-f`. Removing that global line is an operator decision — it would
+# change the default in every repo on the machine, not just this one.
+#
+# What the exception is FOR: `.claude/settings.json` registers the
+# UserPromptSubmit hook at scripts/hooks/reuse-context.mjs, which surfaces the
+# matching rows of docs/COMPONENTS.md before an agent starts building behaviour
+# this repo already ships. It is strictly additive — it prints context and never
+# blocks a tool call — so it is safe to track. Until the global rule goes, the
+# hook works for whoever creates the file locally and ships to nobody.
+#
+# NOTE the trailing `/*`: git cannot re-include a file whose PARENT DIRECTORY is
+# excluded, so `.claude/` plus `!.claude/settings.json` would silently keep
+# ignoring it. Excluding the directory's CONTENTS is what makes the exception
+# reachable at all.
+.claude/*
+!.claude/settings.json
 
 # OS / editor / test output
 .DS_Store

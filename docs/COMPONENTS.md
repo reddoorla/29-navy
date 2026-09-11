@@ -4,16 +4,16 @@
 
 # What this repo already does
 
-Read this **before writing interactive behaviour into a slice**. Not as a rule —
-as a list, because the failure it exists to stop is never disagreement, it is not
-knowing. Three times in two days a slice here re-derived something below.
+Read this **before writing interactive behaviour into a slice** — a carousel, a
+dialog, a disclosure, a focus trap, a reduced-motion check. Not as a rule, as a
+list: the failure it exists to stop is never disagreement, it is not knowing.
 
-Reuse is not always possible: this is a pixel-matched rebuild and the geometry
-gate diffs slice DOM against transcribed Webflow markup, so a component that owns
-its own markup often cannot be dropped in. That is an argument against reusing
-the **component** and never against reading it — the logic is usually liftable
-even when the markup is not, and a deliberate re-derivation gets a line in
-`matching/LEDGER.md` saying which module it declined and why.
+Reuse is not always possible here: this site has a matching harness, and its
+geometry gate diffs slice DOM against transcribed reference markup — a component
+that owns its own markup often cannot be dropped in. That is an argument against
+reusing the **component** and never against reading it: the logic is usually
+liftable when the markup is not. Declining one gets a line in
+`matching/LEDGER.md` naming the module and why.
 
 The **surface** column is the module's real prop/export names, extracted from the
 source. It is the fastest way to recognise what a thing does.
@@ -29,25 +29,25 @@ source. It is the fastest way to recognise what a thing does.
 | [`BrandIcon.svelte`](../src/lib/components/BrandIcon.svelte) | `platform` | 5 | Brand glyphs from simple-icons (CC0 / public domain) — facebook/x/reddit/ instagram from v16, linkedin from v10 (pre brand-removal) |
 | [`ContentBand.svelte`](../src/lib/components/ContentBand.svelte) | `sliceType`, `variation`, `sectionClass`, `contentClass`, `fallbackHeight`, `background`, `children` | — |  |
 | [`ContentWidth.svelte`](../src/lib/components/ContentWidth.svelte) | `reveals`, `style`, `children`, `edgeFadeColor` | 2 |  |
-| [`CountUp.svelte`](../src/lib/components/CountUp.svelte) | `value`, `startValue`, `duration`, `startOnVisible`, `once`, `label`, `decimals`, `prefix`, `suffix`, `useGrouping`, `locale` | 12 |  |
+| [`CountUp.svelte`](../src/lib/components/CountUp.svelte) | `value`, `startValue`, `duration`, `startOnVisible`, `once`, `label`, `decimals`, `prefix`, `suffix`, `useGrouping`, `locale` | 12 | The number to count up to |
 | [`DefaultButton.svelte`](../src/lib/components/DefaultButton.svelte) | `href`, `onclick`, `children` | — | Shape and skin of the shared button, split so callers that must render a different element can still wear it |
 | [`DelayedLink.svelte`](../src/lib/components/DelayedLink.svelte) | `href`, `delay`, `children`, `beforeNavigate`, `onclick` | 5 |  |
 | [`Field.svelte`](../src/lib/components/Field.svelte) | `name`, `label`, `type`, `value`, `description`, `error`, `required`, `autocomplete`, `placeholder`, `minlength`, `maxlength`, `pattern`, `inputmode`, `rows` | 5 |  |
-| [`Footer.svelte`](../src/lib/components/Footer.svelte) | `columns`, `socials`, `text` | 11 |  |
+| [`Footer.svelte`](../src/lib/components/Footer.svelte) | `columns`, `socials`, `text` | 11 | Optional per-route override of the `$lib/site-config.json` footer (no route in the bare template supplies this) |
 | [`Form.svelte`](../src/lib/components/Form.svelte) | `errors`, `errorSummaryTitle`, `children` | 3 |  |
 | [`HeroBackgroundImage.svelte`](../src/lib/components/HeroBackgroundImage.svelte) | `image`, `altFallback`, `preload` | 6 | LCP-optimized hero image |
 | [`Img.svelte`](../src/lib/components/Img.svelte) | `src` | 5 | Progressive-loading wrapper around @zerodevx/svelte-img: the image renders blurred (`.progressive-img` in app.css) and sharpens once the underlying <img> finishes — or fails — loading |
 | [`LandscapeModal.svelte`](../src/lib/components/LandscapeModal.svelte) | — | — |  |
 | [`Modal.svelte`](../src/lib/components/Modal.svelte) | `open`, `onclose`, `children` | 4 |  |
-| [`Nav.svelte`](../src/lib/components/Nav.svelte) | `navLinks`, `items`, `logo` | 14 |  |
-| [`PreNavTransition.svelte`](../src/lib/components/PreNavTransition.svelte) | `duration`, `holdDuration` | 10 |  |
+| [`Nav.svelte`](../src/lib/components/Nav.svelte) | `navLinks`, `items`, `logo` | 14 | Optional per-route override of the `$lib/site-config.json` nav (no route in the bare template supplies this) |
+| [`PreNavTransition.svelte`](../src/lib/components/PreNavTransition.svelte) | `duration`, `holdDuration` | 10 | ms the overlay fades in before the deferred navigation is issued |
 | [`RichTextBody.svelte`](../src/lib/components/RichTextBody.svelte) | `field` | 4 |  |
 | [`RichTextHeading.svelte`](../src/lib/components/RichTextHeading.svelte) | `node`, `children` | — |  |
 | [`ScaleTextToContainer.svelte`](../src/lib/components/ScaleTextToContainer.svelte) | `children` | — |  |
 | [`ScreenWidthMedia.svelte`](../src/lib/components/ScreenWidthMedia.svelte) | `src`, `field`, `altText`, `vimeoId`, `darken`, `backdrop`, `percentHeight`, `children` | 11 |  |
-| [`Seo.svelte`](../src/lib/components/Seo.svelte) | `title`, `description`, `image`, `imageAlt`, `url`, `type`, `siteName`, `locale`, `noindex`, `jsonLd` | 14 |  |
+| [`Seo.svelte`](../src/lib/components/Seo.svelte) | `title`, `description`, `image`, `imageAlt`, `url`, `type`, `siteName`, `locale`, `noindex`, `jsonLd` | 14 | The page title — used verbatim for <title> and og/twitter:title |
 | [`SkeletonLoader.svelte`](../src/lib/components/SkeletonLoader.svelte) | `lines`, `circle`, `height`, `width` | — |  |
-| [`Slider.svelte`](../src/lib/components/Slider.svelte) | `itemCount`, `label`, `children`, `cardsPerView`, `gap`, `mobileGap`, `mode`, `loop`, `autoplay`, `showDots`, `showArrows`, `transitionClass`, `navigationClass`, `arrowClass`, `pauseClass`, `dotClass`, `activeDotClass` | 23 |  |
+| [`Slider.svelte`](../src/lib/components/Slider.svelte) | `itemCount`, `label`, `children`, `cardsPerView`, `gap`, `mobileGap`, `mode`, `loop`, `autoplay`, `showDots`, `showArrows`, `transitionClass`, `navigationClass`, `arrowClass`, `pauseClass`, `dotClass`, `activeDotClass` | 23 | Accessible name for the carousel region — say what's inside ("Customer testimonials"), not "Slider" |
 | [`TransitionOverlay.svelte`](../src/lib/components/TransitionOverlay.svelte) | `visibleDuration`, `fadeOutDuration` | — |  |
 | [`TurnstileWidget.svelte`](../src/lib/components/TurnstileWidget.svelte) | — | 5 |  |
 | [`VimeoBanner.svelte`](../src/lib/components/VimeoBanner.svelte) | `vimeoId`, `poster`, `alt` | 7 | Full-bleed background-video banner |

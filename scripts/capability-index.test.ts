@@ -62,6 +62,30 @@ describe("the capability index", () => {
   });
 });
 
+describe("the portability caveat", () => {
+  // This file ships to every site from the starter, and 29 of the 30 repos in
+  // the fleet have no matching harness. The branch that runs THERE is the one
+  // nobody here can see, so it gets the test.
+  it("names the geometry gate only where a harness actually exists", () => {
+    const entries = buildIndex();
+    const withHarness = renderIndex(entries, ROOT);
+    expect(existsSync(join(ROOT, "matching/harness.json"))).toBe(true);
+    expect(withHarness).toContain("this site has a matching harness");
+    expect(withHarness).toContain("matching/LEDGER.md");
+
+    // A root with no harness — every other site in the fleet.
+    const plain = renderIndex(entries, join(ROOT, "src"));
+    expect(plain).not.toContain("matching harness");
+    expect(plain).not.toContain("matching/LEDGER.md");
+    // …and still says the thing that matters, so the caveat is rewritten rather
+    // than dropped: reuse is a decision made AFTER reading, not instead of it.
+    expect(plain).toContain("after reading the module, not instead of reading it");
+    // The table itself is identical either way — only the caveat differs.
+    const table = (md: string) => md.slice(md.indexOf("| module |"));
+    expect(table(plain)).toBe(table(withHarness));
+  });
+});
+
 describe("surfaceOf", () => {
   it("reads a named Props interface", () => {
     const src = `<script lang="ts">

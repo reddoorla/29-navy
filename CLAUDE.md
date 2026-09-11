@@ -166,6 +166,37 @@ in `matching/LEDGER.md` naming the module and why — `NavyFloorPlans` has one.
 **Check:** `scripts/capability-index.test.ts` fails when the index is stale. That
 guard is retroactive on purpose: it protects the index, not the decision.
 
+**Optional, and the part that actually fires first.**
+`scripts/hooks/reuse-context.mjs` is a `UserPromptSubmit` hook: given a request
+mentioning behaviour this repo ships, it prints the matching rows before the
+agent plans. Measured on the three real cases — "build the hero carousel"
+surfaces `Slider.svelte` (23 tests), "the modals … need some work" surfaces
+`trapFocus.ts` (22), "under reduced motion" surfaces `transitions.ts` (8), and
+"fix the typo in the footer" prints nothing. It never blocks a tool call; one
+false refusal would make the whole mechanism something to route around.
+
+To enable it, create `.gitignore`-permitted `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/reuse-context.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+It is not committed: `~/.config/git/ignore` carries `**/.claude/` machine-wide,
+which beats this repo's exception. Lifting that is an operator decision.
+
 ### Anything found and not fixed in the same PR gets an issue
 
 A code comment is not a tracker and a doc correction is not a fix. The a11y gate
