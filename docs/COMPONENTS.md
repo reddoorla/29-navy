@@ -55,7 +55,7 @@ source. It is the fastest way to recognise what a thing does.
 | [`page-load.ts`](../src/lib/page-load.ts) | `loadPage` | 4 |  |
 | [`page-meta.ts`](../src/lib/page-meta.ts) | `pageMeta` | 2 |  |
 | [`prismicio.ts`](../src/lib/prismicio.ts) | `repositoryName`, `isPlaceholderRepo`, `linkResolver`, `createClient` | 4 |  |
-| [`seo.ts`](../src/lib/seo.ts) | `SITE_NAME`, `SITE_LOCALE`, `DEFAULT_DESCRIPTION`, `DEFAULT_OG_IMAGE`, `OG_IMAGE_WIDTH`, `OG_IMAGE_HEIGHT`, `composeTitle`, `jsonLdScript`, `canonicalUrl`, `resolveOgImage`, `organizationJsonLd` | 19 | Site-wide SEO configuration + helpers |
+| [`seo.ts`](../src/lib/seo.ts) | `SITE_NAME`, `SITE_LOCALE`, `DEFAULT_DESCRIPTION`, `DEFAULT_OG_IMAGE`, `OG_IMAGE_WIDTH`, `OG_IMAGE_HEIGHT`, `composeTitle`, `jsonLdScript`, `canonicalUrl`, `resolveOgImage`, `organizationJsonLd` | 21 | Site-wide SEO configuration + helpers |
 | [`reply-copy.ts`](../src/lib/server/reply-copy.ts) | `replyCopyFor` | — |  |
 | [`site-config.ts`](../src/lib/site-config.ts) | `loadSiteConfig`, `footerColumns` | 4 | Site chrome (navigation + footer) from a checked-in JSON stub |
 | [`site-pages.js`](../src/lib/site-pages.js) | `lang`, `documents` | 3 | The page assemblies for this site — the SINGLE source of truth for both consumers: src/routes/dev/match/[uid], the local matching surface, and the seed that publishes them through Prismic's Migration API |
@@ -71,4 +71,4 @@ source. It is the fastest way to recognise what a thing does.
 | [`richTextHeadings.ts`](../src/lib/utils/richTextHeadings.ts) | `RT_HEADING_CTX`, `defaultLevel`, `buildHeadingLevelMap` | 9 | Editors author arbitrary heading levels inside Prismic rich-text bodies (heading1–6 are all enabled in the slice models) |
 | [`vimeo.ts`](../src/lib/utils/vimeo.ts) | `checkVimeoVideo` | 5 | True when the Vimeo video exists and is embeddable (oEmbed responds 200) |
 
-50 modules, 300 tests behind them.
+50 modules, 302 tests behind them.

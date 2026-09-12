@@ -353,7 +353,7 @@ export function documents(img) {
               ],
               photo: img(
                 "/29navy/assets/68b712e52ecd74e0d37afd1d_matthew-lejune-dv1r5Pftdzk-unsplash.jpg",
-                "Sunlight falling across the brick facade and steel-framed windows of the 29 Navy building.",
+                "The Venice boardwalk a short walk from the building: palms along Ocean Front Walk, people cycling past, and a surfer carrying a longboard.",
               ),
             },
             items: [],

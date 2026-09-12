@@ -1,5 +1,6 @@
 import { render, fireEvent } from "@testing-library/svelte";
 import { describe, it, expect } from "vitest";
+import { isFilled } from "@prismicio/client";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { compile } from "svelte/compiler";
@@ -295,50 +296,38 @@ describe("NavyFloorPlans slice", () => {
 
   // ---- Interaction state that no at-rest gate can see.
 
-  it("underlines the glyph in panels 2/3/4 and only clears it in panel 1", () => {
-    // ref css:3058-3060 sets `text-decoration: none` on `.link-block-14`, which
-    // ONLY the 1st-floor link wears; nothing in the reference sheet clears the
-    // UA underline from a bare <a> (ref css:273 is `.w-button`). Floor 1 is the
-    // panel open at rest, so this shows up only after a click.
-    const { container } = render(NavyFloorPlans, { props: { slice } });
-    const links = [...container.querySelectorAll("a")];
-    expect(links.length).toBe(4);
-    const cleared = links.filter((a) => a.classList.contains("link-block-14"));
-    expect(cleared.length).toBe(1);
-    expect(cleared[0].getAttribute("href")).toBe("https://29navy.com/pdf/file1.pdf");
-    for (const a of links) expect(a.classList.contains("w-inline-block")).toBe(true);
-    expect(ruleBody(".link-block-14")).toMatch(/text-decoration:\s*none;/);
-  });
+  // Three tests sat here asserting the reference's download affordance
+  // rendered: `.link-block-14` on floor 1 only (ref css:3058-3060),
+  // `target=_blank` on floors 2/3/4, and four `._3` Font Awesome glyphs. The
+  // affordance is now deliberately NOT rendered — all four hrefs 404 on the
+  // client's own live site (LEDGER Phase 10, #8) — so what follows is their
+  // inverse: a guard against re-introduction, not a deletion.
 
-  it("carries target=_blank on floors 2/3/4 and not on floor 1", () => {
+  it("renders no download affordance, though every floor still carries a pdf url", () => {
     const { container } = render(NavyFloorPlans, { props: { slice } });
-    const byHref = Object.fromEntries(
-      [...container.querySelectorAll("a")].map((a) => [a.getAttribute("href"), a]),
+
+    // The fixture really does supply what this asserts is unrendered — without
+    // these lines the test would pass just as well against an empty slice.
+    // `isFilled.link` rather than `f.pdf.url`: LinkField widens to the empty
+    // variant, which has no `url`. Narrowing here also means an empty fixture
+    // yields [undefined × 4] and fails loudly instead of type-erroring.
+    expect(slice.primary.floors.map((f) => (isFilled.link(f.pdf) ? f.pdf.url : undefined))).toEqual(
+      [
+        "https://29navy.com/pdf/file4.pdf",
+        "https://29navy.com/pdf/file3.pdf",
+        "https://29navy.com/pdf/file2.pdf",
+        "https://29navy.com/pdf/file1.pdf",
+      ],
     );
-    expect(byHref["https://29navy.com/pdf/file1.pdf"].getAttribute("target")).toBeNull();
-    for (const n of [2, 3, 4])
-      expect(byHref[`https://29navy.com/pdf/file${n}.pdf`].getAttribute("target")).toBe("_blank");
-  });
+    expect(slice.primary.pdf_label).toBe("Download a PDF of this floor");
 
-  it("renders the Font Awesome U+F15B glyph, four times, hidden from the a11y tree", () => {
-    // The reference's `._3` divs look empty in a terminal because the codepoint
-    // is in the private-use area. They are not empty, and the glyph is not an
-    // SVG: the real font file is on disk.
-    const { container } = render(NavyFloorPlans, { props: { slice } });
-    const glyphs = [...container.querySelectorAll("._3")];
-    expect(glyphs.length).toBe(4);
-    for (const g of glyphs) {
-      expect(g.textContent).toBe("");
-      expect(g.getAttribute("aria-hidden")).toBe("true");
-    }
-    // ref html: the per-panel combo classes, including the reference's own typo.
-    expect(glyphs.map(classesOf)).toEqual([
-      "_3 _4the-floor-pdf",
-      "_3 floor-pds",
-      "_3 _2nd-floor-pdf",
-      "_3",
-    ]);
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.querySelectorAll("a").length).toBe(0);
+    expect(container.querySelectorAll(".link-block-14").length).toBe(0);
+    expect(container.querySelectorAll("._3").length).toBe(0);
+    // The caption went with the button: an instruction to press a control that
+    // is not there is worse than neither.
+    expect(container.textContent).not.toContain(slice.primary.pdf_label);
+    expect(container.innerHTML).not.toContain("29navy.com/pdf/");
   });
 
   // ---- Accessibility, which the reference does not have.
@@ -399,15 +388,8 @@ describe("NavyFloorPlans slice", () => {
     }
   });
 
-  it("names each download link, rather than leaving it named by a PUA codepoint", () => {
-    const { container } = render(NavyFloorPlans, { props: { slice } });
-    expect([...container.querySelectorAll("a")].map((a) => a.getAttribute("aria-label"))).toEqual([
-      "Download a PDF of this floor — 4th Floor - Penthouse",
-      "Download a PDF of this floor — 3rd Floor",
-      "Download a PDF of this floor — 2nd Floor",
-      "Download a PDF of this floor — 1st Floor",
-    ]);
-  });
+  // "names each download link, rather than leaving it named by a PUA codepoint"
+  // stood here. The links are gone; the zero-anchor assertion above covers it.
 
   // ---- Responsive image candidates.
 
@@ -435,10 +417,20 @@ describe("NavyFloorPlans slice", () => {
   // ---- Source-level guards. jsdom applies no stylesheet, so the hazards that
   // live in the CSS are asserted against the file the browser will get.
 
-  it("cites a reference line on every declaration in the style block", () => {
+  it("names a source on every declaration in the style block", () => {
     expect(DECLARATIONS.length).toBeGreaterThanOrEqual(80);
-    const uncited = DECLARATIONS.filter((d) => !/\/\* ref css:\d+/.test(d));
+    // `repo a11y:` is NavyResidentLinks' marker for a declaration this repo adds
+    // that the reference has no equivalent of; same spelling here so one grep
+    // finds every deviation in the build.
+    const uncited = DECLARATIONS.filter((d) => !/\/\* (ref css:\d+|repo a11y:)/.test(d));
     expect(uncited).toEqual([]);
+    // Exactly one declaration is not the reference's: the hovered penthouse
+    // tab's ink. Pinned so a second cannot arrive under cover of a category
+    // that already exists — the point of the citation rule is that a deviation
+    // stays countable, not that deviations are forbidden.
+    const nonCss = DECLARATIONS.filter((d) => !/\/\* ref css:\d+/.test(d));
+    expect(nonCss).toHaveLength(1);
+    expect(nonCss[0]).toContain("color: #050101");
   });
 
   it("emits every rule into the bundle, scoped, under its own selector", () => {
@@ -474,11 +466,7 @@ describe("NavyFloorPlans slice", () => {
       "._11",
       "._11:hover",
       "._11:focus",
-      "._3",
-      "._3:hover",
       "._2nd-floor-plan",
-      ".link-block-14",
-      ".w-inline-block",
       ".second-floor-modal",
       "._3rd-floor-modal",
       "._4th-floor-modal",
@@ -493,8 +481,10 @@ describe("NavyFloorPlans slice", () => {
       const re = new RegExp(`${escaped}\\.svelte-[a-z0-9]+${pseudo ? `:${pseudo}` : ""}\\s*[,{]`);
       expect(emitted, `\`${selector}\` is not in the compiled CSS`).toMatch(re);
     }
-    expect(emitted).toContain("@font-face");
-    expect(emitted).toContain("6153165404074dc8073ec349_fa-solid-900.woff2");
+    // No @font-face any more: the "Fa solid 900" face existed only for the
+    // download glyph and went with it. Asserted negatively so a copy-paste
+    // restore of the face without its consumer is caught.
+    expect(emitted).not.toContain("@font-face");
     // The three reference breakpoints survive compilation in order.
     expect((emitted.match(/@media[^{]*/g) ?? []).map((q) => q.trim())).toEqual([
       "@media screen and (max-width: 991px)",
@@ -503,15 +493,16 @@ describe("NavyFloorPlans slice", () => {
     ]);
   });
 
-  it("self-hosts the Fa solid 900 face rather than drawing the glyph", () => {
-    // ref css:2049-2055. If the face fails to load the glyph falls back to
-    // `sans-serif` (ref css:3049) and renders as tofu — but the 50px line box
-    // at ref css:3051 still holds, so every height gate stays green while the
-    // icon is wrong.
-    expect(STYLE).toContain('font-family: "Fa solid 900"');
-    expect(STYLE).toContain("/29navy/fonts/6153165404074dc8073ec349_fa-solid-900.woff2");
-    expect(ruleBody("._3")).toMatch(/font-size:\s*50px;/);
-    expect(ruleBody("._3")).toMatch(/line-height:\s*50px;/);
+  it("ships no Font Awesome face, now that nothing renders a glyph", () => {
+    // Was: "self-hosts the Fa solid 900 face rather than drawing the glyph"
+    // (ref css:2049-2055), asserting the face and `._3`'s 50px line box. Both
+    // existed only for the removed download link. Kept as its inverse so the
+    // face cannot drift back in unused — it is a real font request.
+    // `CSS` is STYLE with comments stripped: the note recording WHY the face
+    // went away names it, and that must not read as the face coming back.
+    expect(CSS).not.toContain("Fa solid 900");
+    expect(CSS).not.toContain("@font-face");
+    expect(CSS).not.toContain("fa-solid-900.woff2");
   });
 
   it("pins no width on the panels or the column — the flex clamp is the mechanism", () => {
@@ -551,14 +542,52 @@ describe("NavyFloorPlans slice", () => {
     expect(CSS).not.toMatch(/min-width/);
   });
 
-  it("puts the +20px glyph margin in the ≤991 block, where 767 and 390 inherit it", () => {
-    // ref css:3209-3211 lives inside the ≤991 block and is never restated, so it
-    // applies at 991, 767 AND 390 — +20px to every panel at three of the four
-    // gate viewports. ref css:3213-3215 sits in the same block but touches the
-    // 2nd-floor panel alone; hoisting it inflates the wrong panels.
+  it("keeps the hovered penthouse tab's label above 4.5:1", () => {
+    // The reference's hover veil (ref css:2321) is 49% white; over the firebrick
+    // band that composites to #d49e97, where the inherited white label measures
+    // 2.30:1 — a serious axe color-contrast violation that only a HOVERED audit
+    // can see. tests/a11y/home.spec.ts catches it end to end, but that spec
+    // reads whatever Prismic serves: the moment an editor gives floor 4 a
+    // `trigger_image`, `.div-block-6` stops rendering and the spec goes green
+    // without measuring anything. This asserts the CSS values themselves.
+    const lin = (c: number) => {
+      const s = c / 255;
+      return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    const L = ([r, g, b]: number[]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const ratio = (a: number[], b: number[]) => {
+      const [hi, lo] = [L(a), L(b)].sort((m, n) => n - m);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+
+    const rule = ruleBody(".div-block-6:hover");
+    const veil = /background-color:\s*(#[0-9a-f]{8})/i.exec(rule)?.[1];
+    const ink = /(?:^|[;{])\s*color:\s*(#[0-9a-f]{6})/i.exec(rule)?.[1];
+    expect(veil, "the reference's hover veil must stay verbatim").toBe("#ffffff7d");
+    expect(ink, "the hover label must carry an explicit ink").toBeTruthy();
+
+    // Composite the veil over the band it actually sits on (--color-firebrick,
+    // src/app.css, ref css:2075) exactly as a browser would.
+    const alpha = parseInt(veil!.slice(7, 9), 16) / 255;
+    const ground = hex("#aa4133");
+    const composited = hex(veil!.slice(0, 7)).map((c, i) =>
+      Math.round(alpha * c + (1 - alpha) * ground[i]),
+    );
+    expect(composited).toEqual(hex("#d49e97")); // what axe reported
+
+    expect(ratio(hex("#ffffff"), composited)).toBeLessThan(4.5); // the defect
+    expect(ratio(hex(ink!), composited)).toBeGreaterThanOrEqual(4.5); // the fix
+  });
+
+  it("scopes the ≤991 padding to the 2nd-floor panel alone", () => {
+    // ref css:3213-3215 sits in the ≤991 block and touches the 2nd-floor panel
+    // ONLY; hoisting it inflates the wrong panels. (ref css:3209-3211 added
+    // +20px to `._3` in this same block — removed with the download glyph, and
+    // asserted absent below, since restoring it would move three viewports.)
     const at991 = CSS.slice(CSS.indexOf("@media screen and (max-width: 991px)"));
     const block = at991.slice(0, at991.indexOf("@media screen and (max-width: 767px)"));
-    expect(block).toMatch(/\._3\s*\{\s*margin-top:\s*20px;\s*\}/);
+    expect(block).not.toContain("._3 ");
     expect(block).toMatch(/\.second-floor-modal\s*\{\s*padding-top:\s*20px;\s*\}/);
     for (const other of ["_1st-floor-modal", "_3rd-floor-modal", "_4th-floor-modal"])
       expect(block).not.toContain(other);

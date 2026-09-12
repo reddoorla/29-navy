@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { asLinkAttrs, isFilled } from "@prismicio/client";
+  import { isFilled } from "@prismicio/client";
   import type { BooleanField, ImageField, KeyTextField, LinkField } from "@prismicio/client";
   import { srcset as prismicSrcset } from "$lib/utils/image";
   import { preloadHidden } from "$utils/preloadHidden";
@@ -64,8 +64,6 @@
       planWidth: 1331,
       planClass: "",
       planId: "",
-      glyph: "_4the-floor-pdf", // sic — the typo is the reference's
-      link: "",
       trailingFpo: false,
     },
     // 1 — reference 3rd floor: `<div class="div-block-38">`
@@ -75,8 +73,6 @@
       planWidth: 1325,
       planClass: "",
       planId: "",
-      glyph: "floor-pds",
-      link: "",
       trailingFpo: false,
     },
     // 2 — reference 2nd floor: `<div class="_2nd-floor-div">`
@@ -86,8 +82,6 @@
       planWidth: 1345,
       planClass: "_2nd-floor-plan",
       planId: "",
-      glyph: "_2nd-floor-pdf",
-      link: "",
       trailingFpo: false,
     },
     // 3 — reference 1st floor: `<div class="_11">`. The only panel open at rest,
@@ -100,8 +94,6 @@
       planWidth: 1214,
       planClass: "",
       planId: "floor-1",
-      glyph: "",
-      link: "link-block-14",
       trailingFpo: true,
     },
   ];
@@ -113,8 +105,6 @@
     planWidth: 1214,
     planClass: "",
     planId: "",
-    glyph: "",
-    link: "",
     trailingFpo: false,
   };
   const refAt = (i: number) => REF[i] ?? FALLBACK;
@@ -208,8 +198,9 @@
     are cited below.
   • Image `alt` is real text; the reference ships `alt=""` on all 23 images, and
     this repo pre-declared that as an accepted text-diff artifact.
-  • The `<a>` wrapping the download glyph gets an `aria-label`; in the reference
-    its whole accessible name is the bare U+F15B private-use codepoint.
+  • The download link is not rendered at all — in the reference its whole
+    accessible name is the bare U+F15B private-use codepoint, and all four of
+    its hrefs 404. See the deviation note at the panel markup below.
   • Panel DOM order here follows the authored floors (4, 3, 2, 1). The reference
     orders the panels 2, 3, 4, 1 while ordering the triggers 4, 3, 2, 1. Since at
     most one panel is ever `display: flex` and the other three generate no box,
@@ -289,28 +280,25 @@
           loading="lazy"
         />
       {/if}
-      {#if isFilled.link(floor.pdf)}
-        <!-- A plain `<a>` built from `asLinkAttrs` rather than `<PrismicLink>`,
-             which resolves the field identically but renders the anchor inside
-             its own component — where this stylesheet's scoping class does not
-             reach, so `.link-block-14` (ref css:3058) and `.w-inline-block`
-             (ref css:246) would silently never match it. -->
-        <a
-          {...asLinkAttrs(floor.pdf)}
-          class={r.link ? `${r.link} w-inline-block` : "w-inline-block"}
-          aria-label={floor.label
-            ? `${slice.primary.pdf_label} — ${floor.label}`
-            : slice.primary.pdf_label}
-        >
-          <!-- U+F15B, fa-file (solid), rendered through the self-hosted
-               "Fa solid 900" face declared below. The reference's div looks
-               empty in a terminal because the codepoint is in the private-use
-               area; it is not empty. Never substituted with an SVG or an icon
-               component — the real font file is on disk. -->
-          <div class={r.glyph ? `_3 ${r.glyph}` : "_3"} aria-hidden="true">&#xf15b;</div>
-        </a>
-      {/if}
-      <div>{slice.primary.pdf_label}</div>
+      <!-- DELIBERATE DEVIATION — the download affordance is not rendered.
+           The reference ships, in every floor panel, an `.link-block-14` anchor
+           carrying a fa-file glyph plus the caption `pdf_label`, pointing at
+           `https://29navy.com/pdf/file{1,2,3,4}.pdf`. All four of those URLs
+           return the same 906-byte Webflow not-found page — on the client's own
+           live site, today (re-checked 2026-09-12; matching/LEDGER.md Phase 0,
+           reddoorla/29-navy#8). Shipping a button whose only outcome is a 404
+           on the client's domain is worse than shipping no button, so neither
+           the anchor nor its caption is rendered.
+
+           The `pdf` and `pdf_label` FIELDS REMAIN MODELLED (model.json) and the
+           content remains in Prismic. When the client supplies the four real
+           PDFs, restore this block and re-point the links — nothing else has to
+           change. Do not re-enable it against the 29navy.com URLs.
+
+           Removing the anchor also removed the page's only `target-size`
+           violation: with the "Hooking up electricity?" / "Plugging in
+           internet?" popups open, they partially obscured this icon down to a
+           11.3×50px hit area (WCAG 2.5.8, serious). See LEDGER Phase 10. -->
       {#if r.trailingFpo}
         <!-- `.image-14`: the fourth child of `._1st-floor-modal`, `display: none`
              at ref css:2789, and grep across all three reference JS chunks
@@ -345,19 +333,11 @@
      ref css:2073. They are written out rather than referenced, because this
      build has no `:root` block carrying the reference's names. */
 
-  /* ref css:2049-2055. Only the woff2 source is shipped: the .eot/.woff/.ttf/
-     .svg fallbacks are on disk under static/29navy/fonts/ but target browsers
-     that cannot run this bundle. Without this face the U+F15B glyph falls back
-     to `sans-serif` (ref css:3049) and renders as tofu at a different advance
-     width — while the 50px line box at ref css:3051 holds, so every height gate
-     stays green and only the icon is wrong. */
-  @font-face {
-    font-family: "Fa solid 900"; /* ref css:2050 */
-    src: url("/29navy/fonts/6153165404074dc8073ec349_fa-solid-900.woff2") format("woff2"); /* ref css:2051 */
-    font-weight: 400; /* ref css:2052 */
-    font-style: normal; /* ref css:2053 */
-    font-display: swap; /* ref css:2054 */
-  }
+  /* The reference's "Fa solid 900" @font-face (ref css:2049-2055) was declared
+     here for the U+F15B glyph in the PDF download link. That link is no longer
+     rendered, so the face had no consumer left and is removed with it; the
+     woff2 is still on disk at static/29navy/fonts/ and ref css:2049-2055 is
+     still in matching/spec/, so restoring it is a copy. */
 
   /* ref css:214-216 — `* { box-sizing: border-box }`. Load-bearing: the 216px
      trigger widths, the 5px/10px paddings and every 4px hover border are
@@ -453,6 +433,21 @@
 
   .div-block-6:hover {
     background-color: #ffffff7d; /* ref css:2321 — background only, never a border */
+    /* DELIBERATE A11Y DEVIATION. ref css:2321's veil is 49% white; composited
+       over the firebrick band behind this trigger it computes to #d49e97, and
+       the label it carries is white — 2.30:1, against the 4.5:1 that WCAG 1.4.3
+       wants for 14px text. The reference ships that failure; this is the only
+       one of the four triggers it reaches, because the other three bake their
+       label into a background PNG where no contrast checker can see it.
+
+       The BACKGROUND is left byte-identical to the reference — the veil is the
+       hover affordance and changing it would change the pixels the geometry
+       gate measures. Only the ink moves, and it moves to a value the reference
+       itself specifies for hover ink in this same component (ref css:3055,
+       `._3:hover`), rather than to one invented here. White 2.30:1 → #050101
+       9.04:1. Asserted in NavyFloorPlans.test.ts and audited, in the hover
+       state, by tests/a11y/home.spec.ts. */
+    color: #050101; /* repo a11y: ref css:3055's own hover ink — see above */
   }
 
   /* The 3rd-floor trigger. Note `cover` at `50%` here against `auto` at `0 0`
@@ -544,25 +539,12 @@
     display: block; /* ref css:3044 */
   }
 
-  ._3 {
-    color: white; /* ref css:3048 — var(--white), ref css:2074 */
-    font-family: "Fa solid 900", sans-serif; /* ref css:3049 */
-    font-size: 50px; /* ref css:3050 */
-    line-height: 50px; /* ref css:3051 — the second term in every modal height */
-  }
-
-  ._3:hover {
-    color: #050101db; /* ref css:3055 */
-  }
-
-  /* Only the 1st-floor link carries this class, and nothing in the reference
-     sheet removes the UA underline from a bare `<a>` (ref css:273 is
-     `.w-button`), so the glyph is UNDERLINED in the 2nd/3rd/4th panels and
-     clean in the 1st. The 1st panel is the one open at rest, so no at-rest
-     gate can see this; it shows up only after a click. */
-  .link-block-14 {
-    text-decoration: none; /* ref css:3059 */
-  }
+  /* `._3` (ref css:3048-3051), `._3:hover` (ref css:3055) and `.link-block-14`
+     (ref css:3059) styled the removed download glyph and its anchor. Note for
+     whoever restores them: `._3`'s 50px line-height was the SECOND TERM IN
+     EVERY PANEL'S HEIGHT, and ref css:3210 added another 20px at 991/767/390 —
+     so putting the link back changes panel geometry at all four breakpoints
+     and needs a gate run, not just a render check. */
 
   .second-floor-modal {
     flex-direction: column; /* ref css:3063 */
@@ -638,10 +620,6 @@
 
     ._11:hover {
       border-style: none; /* ref css:3206 */
-    }
-
-    ._3 {
-      margin-top: 20px; /* ref css:3210 — +20px to every panel at 991, 767 and 390 */
     }
 
     .second-floor-modal {

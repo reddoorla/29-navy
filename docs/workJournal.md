@@ -1657,3 +1657,119 @@ context (shipped) → `UserPromptSubmit` hook injecting matched entries →
 `PreToolUse` on writes to `src/lib/slices/**` → CI audit as the backstop for
 authors who bypass all three. Only the last needs an `@reddoorla/maintenance`
 release, which is why I had reached for it first and why that was backwards.
+
+## 2026-09-12 — Five pre-show items, and the gate refusing the one that was asked for (`fix/pre-show-launch-items`)
+
+Started from "is this site ready to show?". The measurable answer was yes —
+`pnpm verify` exit 0, the matching gate 20/20 at threshold 0.1 with no masks
+across 1440/991/767/390, `/health` reporting `prismic: ok`, and axe clean on the
+live home page at 1440 and 390. The useful answer was no, for three reasons a
+visitor meets in the first five minutes. The operator then asked for five
+things. Four are done; the fifth is measured and waiting on a decision.
+
+**The a11y green was not evidence, and saying so cost two real defects.**
+`tests/a11y/fixtures.spec.ts` audits `/dev/a11y-fixtures` and `/dev/animate-in`.
+No Navy slice is mounted on either. Every a11y pass in this repo's history has
+therefore been a statement about the starter's components, and #24 had already
+named the gap for the resident popups. Auditing the REAL page found two serious
+violations, and — this is the part worth keeping — **auditing it at rest would
+have found neither.** Both need an interaction:
+
+- `color-contrast` **2.30:1** on the penthouse floor tab's label. `.div-block-6:hover`
+  takes `background-color: #ffffff7d` (ref css:2321); 49% white composited over
+  the firebrick band is `#d49e97`, and the label stays inherited white. Needs a
+  pointer on the element.
+- `target-size` on the floor-plan download icon, squeezed to an **11.3×50px**
+  hit area when the electricity or internet popup opens over it. Needs a popup
+  open — and only those two of the seven, because only those two overlap it.
+
+`tests/a11y/home.spec.ts` now drives the composed page: four breakpoints at rest,
+every floor tab hovered AND opened, all seven popups opened. Under
+`no-preference`, deliberately — the shared config forces
+`contextOptions.reducedMotion: "reduce"` and the popups branch on it, so
+inheriting it audits only the synchronous path.
+
+**It cost a debugging round to make that spec non-vacuous, in exactly the way
+the spec exists to prevent.** The first version clicked immediately after
+`goto`, before hydration. The triggers are `<a href="#">` server-side, so the
+click followed the empty fragment, nothing opened, and axe audited the closed
+page — green, measuring nothing. `waitUntil: "networkidle"` fixes it; the
+`toHaveCount(1)` on a visible dialog is what makes the failure loud instead of
+silent. A second version used `click({ force: true })`, which dispatches at the
+element's coordinates and landed on the hero overlay — same silent nothing.
+
+**The contrast fix reuses the reference's own ink.** Background left verbatim
+(it is the hover affordance and the gate measures those pixels); only the label
+moves, to `#050101`, which is ref css:3055's own hover ink for this component.
+2.30:1 → 9.04:1. A unit test composites the two reference values independently
+and lands on `#d49e97` to the byte, which is what confirmed the diagnosis rather
+than assuming axe's reading. That test exists because the axe spec reads
+whatever Prismic serves: give floor 4 a `trigger_image` and `.div-block-6` stops
+rendering and the spec goes green having measured nothing.
+
+**The download link: #8 described a mitigation that was never in the code.** The
+issue said the rebuild "ships with the download link disabled rather than
+pointing at a 404". It did not — the live candidate served
+`href="https://29navy.com/pdf/file1.pdf"`, and all four still 404 (re-checked
+2026-09-12). Removed the anchor, its glyph, and the `pdf_label` caption, because
+an instruction to press a control that is not there is worse than neither. The
+`pdf`/`pdf_label` fields stay modelled and populated; restoring is one block.
+
+**And the gate refused it, correctly.** `._3`'s 50px line-height was the second
+term in every panel's height and ref css:3210 added 20px more at ≤991, so the
+Lofts region is now ~90px shorter than a reference that still offers the broken
+button. `Hover or click on a floor` fails at all four breakpoints — mm 8.6% /
+9.0% / 10.3% / 13.2% against threshold 0.1, Δh 7.9%–12.2% against
+maxHeightDelta 0.05. That is not a defect to fix; it is the measured cost of the
+removal the operator asked for. It belongs in `ACCEPTED` in `matching/floors.mjs`
+— "regions the OPERATOR has looked at and chosen to leave failing" — not in
+`FLOORS`, because we _can_ reproduce it; we chose not to. Left undeclared: rule
+5 names a novel floor as the operator's decision, and adding it myself is
+exactly the "reclassify it to make it go away" the rules forbid.
+
+**Share card.** `DEFAULT_OG_IMAGE` was `""`, so every pasted link degraded to
+`twitter:card: summary` — text, no picture. `static/og-default.jpg` (1200×630,
+204KB) is built by `scripts/og-card.mjs` from the client's own hero photograph
+and wordmark. The crop is recorded rather than remembered: `top: 248` is the
+highest window that still contains the entrance and the building's real black
+"29 NAVY" plate, which is the one part of the frame that identifies the address;
+the first attempt at `top: 96` kept more sky and cut exactly that. The wordmark
+is composited (`blend: "screen"` drops its black ground), not retypeset. A test
+asserts the FILE exists at 1200×630 — a constant pointing at a missing file
+emits a perfectly well-formed `<meta>` tag for a 404.
+
+**Turnstile is blocked on Cloudflare, and the block is the documented one.**
+`reddoor-maintenance/docs/runbooks/turnstile-widgets.md`: a widget holds 10
+hostnames, a sitekey served from a hostname not on its widget's list throws
+`110200`, renders nothing and mints **no token**, and `/health` cannot see that
+because it only checks the env var is a non-empty string (#689 — and the exact
+shape CLAUDE.md's worked example is about). No `CLOUDFLARE_*` credentials on this
+machine, so listing widget capacity and allowlisting a hostname are not
+available here. What WAS verified: with Cloudflare's documented always-passes
+test sitekey exported locally, the widget mounts and **mints a real token**
+(`XXXX.DUMMY.TOKEN`, 21 chars). This repo's half works; the missing piece is a
+sitekey whose widget allowlists `29-navy.netlify.app`. The test key was never
+committed and never set on Netlify.
+
+**Images: the answer was one, not eight.** The eight local `/29navy/` image
+occurrences are three unique files — the close icon (×6, UI chrome, belongs in
+code), the hidden `.image-14` FPO jpg (`display: none`, kept for capture
+fidelity), and the nav logo. Only the logo is arguably content, and even it is
+chrome. So: nothing urgently needs routing through Prismic, which is a better
+answer than the one the question invited.
+
+**What the image audit did find was worse than a routing question.** The Contact
+section's photograph is a Venice boardwalk stock shot — palms, cyclists, a
+surfer. That is the client's own choice; it is in the reference capture with
+`alt=""`. But this repo authors real alt text, and the one written for it reads
+"Sunlight falling across the brick facade and steel-framed windows of the 29
+Navy building." It describes a photograph that is not there. A sighted visitor
+sees a beach; a screen-reader user is told they are looking at the building.
+Corrected in `src/lib/site-pages.js` and `NavyContact/mocks.json` — **but the
+published Prismic copy still carries the wrong string**, and that is what the
+live site serves. Not fixed here: it is a content write to the client's CMS.
+
+**Corrected belief.** Earlier in the session I reported the two `target-size`
+nodes as a defect in the resident popups. They were not. `.link-block-14` is the
+floor-plan download anchor; the popups only OBSCURE it. The violation went away
+with the anchor and is recorded as a consequence, not a fix.

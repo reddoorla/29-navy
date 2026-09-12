@@ -16,8 +16,13 @@ export const DEFAULT_DESCRIPTION = "";
  *  card (Twitter downgrades to a small summary). Set this to a shipped asset
  *  (e.g. "/og-default.png") per site so shares are never imageless — a
  *  Reddoor-branded default is deliberately NOT shipped, since every cloned
- *  site would then leak the Reddoor card until the owner replaced it. */
-export const DEFAULT_OG_IMAGE = "";
+ *  site would then leak the Reddoor card until the owner replaced it.
+ *
+ *  Built by `node scripts/og-card.mjs` from the client's own hero photograph
+ *  and wordmark; that script records the crop. Its presence and its 1200×630
+ *  canvas are asserted in seo.test.ts — a constant pointing at a missing file
+ *  emits a perfectly well-formed <meta> tag for a 404. */
+export const DEFAULT_OG_IMAGE = "/og-default.jpg";
 
 /** Social-card canvas. Prismic og images are cropped to this exact box so a
  *  card never ships a multi-MB original, and width/height can be advertised. */

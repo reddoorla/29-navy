@@ -424,3 +424,78 @@ Gate: **20/20**, `Paying rent online?` 0.0% at 1440/991/390 and 1.2% at 767
 blocked: the gate diffs that subtree against transcribed Webflow DOM and the
 component owns its own markup and `transition:slide`. The duplication is ~9 lines
 of key handling. Left as is, deliberately.
+
+## Phase 10 — the download link is removed, and the hover ink is ours (2026-09-12)
+
+Two deviations decided in this round, one at the operator's instruction and one
+found while verifying it. Both are recorded at the moment of the decision.
+
+### [deviation] The floor-plan download affordance is not rendered
+
+Phase 0 recorded, on 2026-09-09, that all four `https://29navy.com/pdf/file{1,2,3,4}.pdf`
+links answer 404 from the apex, from `www` and over `http`, while a control
+request to the site root answered 200/21156. **Re-checked 2026-09-12: still
+404, all four.** The rebuild had been shipping the links anyway — the live
+candidate served `href="https://29navy.com/pdf/file1.pdf"` and friends — so
+every floor panel offered a button whose only outcome was a Webflow not-found
+page on the client's own domain, under a page whose meta description advertises
+"download a PDF of any floor". reddoorla/29-navy#8 asserted the opposite ("the
+rebuild's floor-plan modals ship with the download link disabled rather than
+pointing at a 404"); that was never true in code, and the issue is corrected
+rather than quietly satisfied.
+
+Removed: the `.link-block-14` / `.w-inline-block` anchor, its `._3` U+F15B glyph
+child, and the `pdf_label` caption div that instructed the reader to press it.
+An instruction to press a control that is not there is worse than neither.
+
+**The `pdf` and `pdf_label` fields stay modelled and stay populated.** Restoring
+is one block of markup when the client supplies the four real PDFs.
+
+What went with it, and why the restore is not free:
+
+- `@font-face "Fa solid 900"` (ref css:2049-2055) — the glyph was its only
+  consumer. The woff2 is still at `static/29navy/fonts/`.
+- `._3` (ref css:3048-3051), `._3:hover` (ref css:3055), `.link-block-14`
+  (ref css:3059), and `._3 { margin-top: 20px }` inside the ≤991 block
+  (ref css:3210).
+- **`._3`'s 50px line-height was the second term in every panel's height, and
+  ref css:3210 added 20px more at 991/767/390.** So this is a geometry change at
+  all four breakpoints, not a cosmetic one. Gate re-run under tag `pdfremoval`.
+
+### [deviation, a11y] The hovered penthouse tab gets its own ink
+
+`.div-block-6:hover` takes `background-color: #ffffff7d` (ref css:2321). That
+veil is 49% white; composited over the firebrick band behind it the computed
+value is **#d49e97**, and the label the trigger carries is inherited white —
+**2.30:1**, against the 4.5:1 WCAG 1.4.3 asks for 14px text. axe reports it
+`serious`. Reproduced independently by compositing the two reference values in a
+unit test, which lands on #d49e97 to the byte.
+
+This is the reference's own defect, and it reaches exactly one of the four floor
+triggers: `.div-block-6` is the only one whose label is live text. The other
+three bake their label into a background PNG, where no contrast checker can see
+it and the same failure may well be present.
+
+**The background is left verbatim** — it is the hover affordance and the gate
+measures those pixels. Only the ink moves, and it moves to `#050101`, which is
+the reference's OWN hover ink for this component (ref css:3055, `._3:hover`),
+not a value invented here. 2.30:1 → 9.04:1.
+
+Tagged `repo a11y:` in the style block, following NavyResidentLinks' convention,
+and the count of non-`ref css` declarations in this slice is pinned at 1 so a
+second cannot arrive under cover of the category.
+
+### Why neither was caught before
+
+`tests/a11y/fixtures.spec.ts` audits `/dev/a11y-fixtures` and `/dev/animate-in`.
+No Navy slice is mounted on either, so the a11y gate had never audited anything
+this site ships (#24). Both defects also need an INTERACTION — a pointer on the
+trigger, or a popup open over the link — so even auditing `/` at rest would have
+missed both. `tests/a11y/home.spec.ts` now drives the real page: four
+breakpoints at rest, every floor tab hovered and opened, every one of the seven
+resident popups open, under `no-preference` so the timed fade path is the one
+measured rather than the synchronous branch the shared config forces.
+
+The `target-size` violation (the download icon squeezed to an 11.3×50px hit area
+by the electricity and internet popups) was not fixed on its own terms — it went
+away with the anchor. Recorded that way rather than claimed as a fix.
