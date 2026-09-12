@@ -1773,3 +1773,52 @@ live site serves. Not fixed here: it is a content write to the client's CMS.
 nodes as a defect in the resident popups. They were not. `.link-block-14` is the
 floor-plan download anchor; the popups only OBSCURE it. The violation went away
 with the anchor and is recorded as a consequence, not a fix.
+
+### Same day, later — the gate toggle, the form that does not exist, and a staged release
+
+**The gate is ACCEPTED, not floored.** The operator looked at the four failing
+`Hover or click on a floor` regions and accepted them; matching is done. Entered
+in `matching/floors.mjs` under `ACCEPTED`, keyed on `(page, label)` rather than
+label alone — this file's own header warns that a label-only entry starts
+accepting failures on pages that do not exist yet. `next.mjs` now exits 0 with an
+empty backlog and prints all four under "Operator-ACCEPTED failures", and the
+score reads an honest **16/20**, not a restored 20/20.
+
+**`strikes.mjs` does not know about ACCEPTED, and now reports these four as
+stalled forever.** It imports `FLOORS` only (`strikes.mjs:25,129`), so an
+operator-accepted region trips "flat across N runs" on every future run and exits
+
+1. That is a harness bug, not a site one: `strikes.mjs` is recipe-owned
+   (`reddoor-maint match-harness`), and a hand edit here is flagged on the next
+   upgrade. **Not worked around** — putting the region in `FLOORS` to silence it is
+   exactly the reclassification rule 3 forbids, and it would also be false. Left as
+   is, reported upstream. Whoever runs a geometry round on this site next will see
+   strikes exit 1 with these four and should ignore them.
+
+**There is no form on this site, so Turnstile was closed as not applicable
+(#30).** Verified rather than assumed: no nav item points at `/contact` (the
+"Contact" item is `/#contact`, an anchor to the address block), `NavyContact`
+contains no `<form>` and no `<input>`, and nothing in `src/` links to `/contact`.
+The route is an unlinked starter default. It still answers 200 on the live site
+and would submit to central ingest if anyone found it — noted, not fixed.
+
+This is the second time this session that an item was closed by checking what
+the page actually contains rather than what the repo is capable of. The first was
+"which images should move to Prismic" — eight occurrences, three files, answer:
+none urgently.
+
+**The alt-text correction is staged as a Prismic release, not published.**
+Release `aqWOwBEAAGUDWxhH`, one document. Reading the published document to build
+it surfaced a second defect the code change had created and nobody had looked
+for: `meta_description` still ended "**and download a PDF of any floor**". The
+button was removed hours earlier. A meta description is the one piece of copy
+that promises a feature to someone who has NOT loaded the page — it is the last
+place a removed feature keeps being advertised, and the first place a search
+result shows it. Both corrections are in the release; the repo seed
+(`site-pages.js`) carries the same two strings and was corrected to match, so the
+two cannot drift.
+
+Worth stating plainly: **removing a feature is not done when the markup is
+gone.** The class is "everywhere the feature is described" — markup, caption,
+meta description, and the issue that tracked it. Three of those four were found
+only because something else forced a re-read.
