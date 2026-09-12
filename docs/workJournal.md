@@ -1822,3 +1822,57 @@ Worth stating plainly: **removing a feature is not done when the markup is
 gone.** The class is "everywhere the feature is described" — markup, caption,
 meta description, and the issue that tracked it. Three of those four were found
 only because something else forced a re-read.
+
+### Same day, last — publishing the release found the defect the release was hiding
+
+The operator published `aqWOwBEAAGUDWxhH`. The live page did not change. Both
+halves were individually correct — the Prismic document read
+`version.status: "published"` with the new strings, and the merge had deployed at
+17:47:42 — but **no Netlify build hook exists on this site**
+(`listSiteBuildHooks` → `NONE CONFIGURED`), and `+layout.server.ts:3` sets
+`prerender = "auto"`, so `/` is baked at build time. **No Prismic publish has
+ever reached production on this site.** Only a git push has.
+
+This is the most valuable thing the session found and it was found by accident —
+by verifying someone else's action rather than reporting the staging of it. A
+release that is staged and a release that is published look identical from
+inside the CMS; so do a site that renders content and a site that renders the
+content it was built with.
+
+**It is near-invisible by construction.** Every surface an editor checks shows
+the new content: the document reads published, Prismic preview renders it
+(preview bypasses the prerendered page), and the next code PR's deploy preview
+shows it too, because that PR triggers a build. Production is the only wrong
+surface, and the next unrelated code push silently fixes it — so it presents as
+intermittent rather than systematic, and the evidence of it disappears exactly
+when someone goes looking.
+
+Filed as #31, with the note that `docs/NEW-SITE.md`'s Deploy section lists env
+vars and says "Renovate needs nothing per-repo" while never mentioning a build
+hook or a webhook — so **every site cloned from the starter has this gap**, and
+the fix belongs upstream. Triggered one build by hand
+(`6aa5927edace9975922623a8`) and verified the corrected description and alt text
+on the production URL. That is a workaround, not the fix.
+
+**A claim in the previous commit was false and is corrected here.** That message
+said the `strikes.mjs`/`ACCEPTED` gap was "reported upstream instead". It was
+not — nothing had been filed. It is now `reddoorla/reddoor-maintenance#772`.
+Writing "reported upstream" in a commit body is precisely the failure CLAUDE.md
+names: a code comment is not a tracker, and neither is a commit message.
+
+**Swept for anything else outstanding without an issue**, which is what prompted
+all of the above:
+
+- #31 build hook (new, above).
+- #32 — `/contact` is live, unlinked, styled as the starter, and accepts posts
+  into central ingest with no Turnstile. Recommend deleting the route.
+- #33 — the staging host is fully indexable and `sitemap.xml` advertises it,
+  competing with the client's own live `29navy.com`. Noted that a noindex which
+  outlives the domain cutover is a worse failure than the one it prevents.
+- #34 — the editorial question about the Venice stock photograph, split out of
+  #29 so it would not close along with the defect. Filing the question is the
+  point; "leave it" is a fine answer, it just needs to be recorded once.
+
+Still open and correctly so: #8 (client must supply four floor-plan PDFs), #4
+(Renovate dashboard), and PRs #2/#3 (sharp security bumps, untouched this
+session).
