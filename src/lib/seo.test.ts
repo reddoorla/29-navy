@@ -8,6 +8,7 @@ import {
   SITE_NAME,
   OG_IMAGE_WIDTH,
   OG_IMAGE_HEIGHT,
+  DEFAULT_OG_IMAGE,
 } from "./seo";
 
 const PRISMIC = "https://images.prismic.io/acme/abc.png?auto=compress";
@@ -156,5 +157,33 @@ describe("organizationJsonLd", () => {
       sameAs: [],
     }) as Record<string, unknown>;
     expect("sameAs" in ld).toBe(false);
+  });
+});
+
+describe("the shipped default share card", () => {
+  // DEFAULT_OG_IMAGE is a string, so nothing about it fails loudly: point it at
+  // a file that is not there and the page still emits a well-formed og:image
+  // tag — for a 404. Every scraper then shows no card, which is the state this
+  // constant was set to fix. So assert the FILE, not the constant.
+  it("exists, at the exact canvas the card meta advertises", async () => {
+    const { statSync } = await import("node:fs");
+    const sharp = (await import("sharp")).default;
+
+    expect(DEFAULT_OG_IMAGE).toMatch(/^\/[\w.-]+\.(jpg|png)$/);
+    const file = `static${DEFAULT_OG_IMAGE}`;
+    expect(statSync(file).isFile()).toBe(true);
+
+    const { width, height } = await sharp(file).metadata();
+    expect({ width, height }).toEqual({ width: OG_IMAGE_WIDTH, height: OG_IMAGE_HEIGHT });
+    // Facebook and LinkedIn both refuse cards over 8MB; stay far under it.
+    expect(statSync(file).size).toBeLessThan(1_000_000);
+  });
+
+  it("turns the twitter card into the large variant", () => {
+    // The whole point of setting the constant: `summary` (no image) becomes
+    // `summary_large_image`. Seo.svelte keys that off `og` being resolvable.
+    expect(resolveOgImage(DEFAULT_OG_IMAGE, "https://29-navy.netlify.app")).toEqual({
+      url: "https://29-navy.netlify.app/og-default.jpg",
+    });
   });
 });

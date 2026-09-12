@@ -64,10 +64,14 @@ export function documents(img) {
         // claimed that the page does not already say. DRAFT COPY: it is
         // client-facing and nobody has approved it.
         meta_title: "29 Navy — Creative Lofts for Lease in Venice",
+        // "and download a PDF of any floor" was here until 2026-09-12. The
+        // download affordance is no longer rendered (all four PDFs 404 on the
+        // client's own site — LEDGER Phase 10, #8), and a meta description is
+        // the one piece of copy that promises a feature to someone who has not
+        // loaded the page yet. Staged in Prismic in the same change.
         meta_description:
           "Creative lofts for lease at 29 Navy Street, Venice, California. " +
-          "Browse floor plans for all four floors, including the penthouse, " +
-          "and download a PDF of any floor.",
+          "Browse floor plans for all four floors, including the full-floor penthouse.",
         // The reference is ONE page in six sections plus shared chrome
         // (matching/SPEC.md). Order here is reference document order, which is
         // also cut order for the harness: the four anchors occur once each at
@@ -353,7 +357,7 @@ export function documents(img) {
               ],
               photo: img(
                 "/29navy/assets/68b712e52ecd74e0d37afd1d_matthew-lejune-dv1r5Pftdzk-unsplash.jpg",
-                "Sunlight falling across the brick facade and steel-framed windows of the 29 Navy building.",
+                "The Venice boardwalk a short walk from the building: palms along Ocean Front Walk, people cycling past, and a surfer carrying a longboard.",
               ),
             },
             items: [],
