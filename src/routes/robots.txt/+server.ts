@@ -23,12 +23,21 @@ export const GET: RequestHandler = ({ url }) => {
 Disallow: /
 `
     : // Fence crawlers off the dev/tooling routes (which `prerender = "auto"`
-      // still emits as public static HTML) and Prismic preview URLs (which
-      // canonicalize to the real page anyway). Content routes stay open.
+      // still emits as public static HTML), Prismic preview URLs (which
+      // canonicalize to the real page anyway), and /contact — a starter default
+      // this site never adopted: nothing links to it, it is absent from the
+      // sitemap, and it renders the starter's unstyled form rather than this
+      // build's design, so it is not a page to offer a search engine on the
+      // client's domain. Whether it is deleted or built out for real is #32;
+      // this line is right under either answer. Note what it does NOT do: spam
+      // bots don't read robots.txt, so the route still accepts posts into
+      // central ingest. That half of #32 is untouched here, on purpose.
+      // Content routes stay open.
       `User-agent: *
 Disallow: /dev/
 Disallow: /slice-simulator
 Disallow: /preview/
+Disallow: /contact
 
 Sitemap: ${url.origin}/sitemap.xml
 `;

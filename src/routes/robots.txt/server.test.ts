@@ -13,10 +13,22 @@ describe("GET /robots.txt", () => {
     expect(body).toContain("User-agent: *");
   });
 
-  it("fences off the dev/tooling and preview routes, nothing else", async () => {
+  it("fences off the dev/tooling, preview and starter-contact routes, nothing else", async () => {
     const body = await (await get("https://example.com")).text();
     const disallowed = [...body.matchAll(/Disallow: (\S+)/g)].map((m) => m[1]);
-    expect(disallowed).toEqual(["/dev/", "/slice-simulator", "/preview/"]);
+    expect(disallowed).toEqual(["/dev/", "/slice-simulator", "/preview/", "/contact"]);
+  });
+
+  // /contact is a reddoor-starter default this site never adopted: no nav item
+  // points at it (site-config's "Contact" is the /#contact anchor), nothing in
+  // src/ links to it, and it is absent from sitemap.xml — but it answers 200 and
+  // renders the starter's unstyled form instead of this build's design. Whether
+  // it should be deleted or built out for real is an open question (#32); either
+  // answer leaves it wrong to have it indexed on the client's domain meanwhile.
+  it("fences off the unlinked starter contact route", async () => {
+    const body = await (await get("https://example.com")).text();
+    const disallowed = [...body.matchAll(/Disallow: (\S+)/g)].map((m) => m[1]);
+    expect(disallowed).toContain("/contact");
   });
 
   it("points at the sitemap with an absolute URL on the request origin", async () => {
