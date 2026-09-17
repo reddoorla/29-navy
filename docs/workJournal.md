@@ -2055,3 +2055,121 @@ production, and the a11y audit, the Lighthouse run, the shared Playwright
 config's readiness probe and the match harness all serve `/dev` routes. Setting
 `gateServer: "preview"` would break all four. Left alone, noted so the next
 session does not "finish" the bootstrap step by switching it.
+
+## 2026-09-17 (later) — Enrolled, and the switch had already been thrown by hand (#41, `docs/enrollment-journal`)
+
+Second half of the review session above. That entry ends with the site live on
+`29navy.com` and the fleet row reading `Status: building`; this one closes the
+gap and corrects two things the first entry got wrong by not looking far enough.
+
+### The cutover has a timestamp, and it is in Discord
+
+`#worthe-web-maintenance`, 2026-09-17. Tucker at 16:39: _"am i approved to
+cutover to https://29-navy.netlify.app/?"_ Tim Holmes at 16:39: _"yes. move it
+over and confirm when it's live and I'll cancel webflow site."_ Tucker at 16:58:
+_"moved, waiting for it to propogate and cert to get given."_
+
+**16:58 matches the Netlify `published_deploy.published_at` of
+`2026-09-17T16:58:35Z` to the minute.** So the entry above was right that the
+cutover had happened and wrong to treat its date as unknowable — the record
+existed, in the project channel, and the first pass simply did not look there.
+Worth keeping as a method note: the fleet's own APIs could say _that_ a thing
+happened and never _why_ or _on whose say-so_, and both were one channel read
+away.
+
+### The enrolment switch was flipped by hand, mid-session
+
+`forms-notify-target 29-navy` read `Status: building` at the start of this
+session and `Status: maintained` two hours later, with nothing I ran capable of
+changing it (`ensure-site` writes Status on create only). The operator flipped
+it in Airtable directly while the review was in flight.
+
+So the finding in #41 was real and is now closed by the operator's own action
+rather than by anything here. Recording it because the _sequence_ is the useful
+part: the site was live and unwatched for some hours, and the thing that ended
+that was a person editing a cell, not any mechanism. Nothing observes the DNS
+cutover; nothing ever will until #646 lands and the launch path stops depending
+on a field a human remembers to change.
+
+**Confirmed by the real code path rather than by reading the cell.**
+`fromAirtableBase` — the provider `--fleet airtable` resolves to, and the one
+all five nightly workflows use — now returns the site:
+
+```
+fleet inventory size: 14
+29-navy present:      YES
+  name=29-navy  deployedUrl=https://29navy.com
+```
+
+### The four preflight blockers, and what each one actually was
+
+`preflight 29-navy` went from `2 fail, 2 warn` to `✓ clean`:
+
+- **Lighthouse scores** — none on the row. Ran against the live apex:
+  **P=91 A=100 BP=96 SEO=100**, all categories passing, written back.
+- **Header image** — none. Generated and uploaded (0.70 MB).
+- **Point of contact** — empty since bootstrap, where it was correctly skipped
+  rather than guessed. It was in Discord the whole time: Tim, 18:33 today,
+  _"you can send a maintenance email to Matthew at Worthe MatthewB@worthe.com."_
+  Set via `ensure-site --contact`, which filled it because the cell was blank.
+- **`maintenance day` anchor of 2025-01-22** with `maintenence freq: Yearly` —
+  over 13 months stale, so `report --due` would have drafted a **back-dated
+  overdue report to the client**. Reset to 2026-09-17.
+
+And the row's `url` was `https://www.29navy.com/` — the address of the _Webflow_
+site, set at bootstrap when that is what it was. Every path on that host now
+301s to the apex, so a redirect-following probe survives and a manual one does
+not. Now `https://29navy.com`, which is also what the page's own
+`rel=canonical` and `sitemap.xml` declare.
+
+**`ensure-site` refused both of those, correctly.** It is fill-blanks-only on
+the exists path precisely so a re-runnable bootstrap cannot clobber an operator
+edit, and a stale-but-present value is indistinguishable from a deliberate one.
+They went in through the Airtable REST API instead, with a before/after
+read-back on each and `Status`/`point of contact` printed as unchanged controls.
+
+**One thing that leaves open, and it is mine.** `ensure-site` and `header-image`
+both log `SITE_MIRROR … mirrored=1` — they write Airtable and mirror into Turso.
+A raw REST PATCH does neither, so the Turso mirror may now hold the old `url`
+and anchor. `db parity` would settle it and was denied by the sandbox before it
+ran, so **this is unverified, not verified-clean**. Turso is not read by any
+inventory today (there is no Turso `InventoryProvider` — only airtable, json and
+local), so nothing is consuming the drift; that stops being true the moment #646
+lands.
+
+### A belief worth correcting, because it is the fleet's direction
+
+Working assumption in the room was that Airtable is already superseded and
+should no longer be part of the launch process. The intent is real and tracked —
+reddoor-maintenance **#646, "Phase 6 (#539): delete the Airtable layer", is
+OPEN** — but the code has not moved: all six `--fleet` flags across the five
+nightly workflows still pass `--fleet airtable`, `src/inventory/` ships exactly
+three providers (airtable, json, local), and none of them reads Turso. So today
+the Airtable `Status` cell remains the one switch that enrols a site, which is
+exactly why the hand-edit above was load-bearing.
+
+The `new-site` skill has already been amended to say so (claude-skills
+`446748b`); an earlier version of that same file asserted the opposite — "Turso
+is the authoritative store; Airtable is a legacy shadow write pending deletion".
+Both readings are in circulation. The current one matches the code.
+
+### Still stale on the row, found and not fixed
+
+`cms host` and `site host` both read `https://webflow.com/dashboard`. Neither is
+true any more — the CMS is Prismic and the host is Netlify. Left alone rather
+than guessed at, since these feed client-facing report copy and the correct
+values are a decision, not a lookup.
+
+### What the build hook now has behind it
+
+The entry above reported the `Prismic publish` hook existing and never having
+fired. The operator triggered it during this session, and
+`2026-09-17T19:02:23Z ready production "Deploy triggered by hook: Prismic
+publish"` is the **first hook-triggered deploy in the site's 78-deploy
+history**. That proves the webhook is registered, reachable and wired to this
+site.
+
+It does **not** prove the webhook is subscribed to the document-publish _event_
+rather than merely answering a test press — those look identical from outside,
+and the difference is the whole of #31. #42 stays open for the one remaining
+artefact: a publish that reaches production with no git push behind it.
