@@ -237,8 +237,28 @@ describe("NavyHeroSlider slice", () => {
   });
 
   describe("motion", () => {
-    // Every number below is the reference's own: data-delay="3000",
-    // data-duration="500", data-easing="ease", data-infinite="true".
+    // The reference declares data-delay="3000", data-duration="500",
+    // data-easing="ease", data-infinite="true". NONE of the three still holds.
+    // The timings are Reddoor's slideshow props (`transitionMs = 1600`,
+    // `interval = 5000`, reddoor-website Slideshow.svelte) and the curve is
+    // Reddoor's HOUSE token `--transition-fast-slow` — `ease-fast-slow`,
+    // src/app.css:39 — which is NOT the same shape as the `ease` both the
+    // reference and Reddoor's own slideshow use. See the component's Motion
+    // block for why the house token is the right match and the slideshow's is
+    // not, and matching/LEDGER.md for the deviation record.
+    //
+    // Asserted as the token, not as `cubic-bezier(0.5, 0, 0, 1)`: the point of
+    // referencing app.css is that this slice cannot drift from the rest of the
+    // site, and a test pinning the resolved value would pass through exactly
+    // the drift it exists to catch.
+    //
+    // Named here rather than inlined so the pair has ONE home in this file: the
+    // previous spelling repeated `3000` in nine places, and a timing change
+    // that updates eight of them leaves a test asserting the old cadence while
+    // still passing for the wrong reason.
+    const SLIDE_MS = 1600;
+    const DELAY_MS = 5000;
+    const EASE = "var(--transition-fast-slow)";
     const xs = (container: Element) =>
       [...container.querySelectorAll(".w-slide")].map((el) => {
         const m = /translateX\((-?\d+)%\)/.exec(el.getAttribute("style") ?? "");
@@ -293,7 +313,7 @@ describe("NavyHeroSlider slice", () => {
         expect(onScreen, `step ${step}: positions ${positions(container).join(" ")}`).toHaveLength(
           1,
         );
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(DELAY_MS);
         await tick();
       }
     });
@@ -315,10 +335,10 @@ describe("NavyHeroSlider slice", () => {
       // while the other five still share theirs.
       vi.useFakeTimers();
       const container = mountSlider();
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(DELAY_MS);
       await tick();
       expect(new Set(xs(container)).size, "away from a wrap the strip moves as one").toBe(1);
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(DELAY_MS);
       await tick();
       const counts = new Map<number, number>();
       for (const x of xs(container)) counts.set(x, (counts.get(x) ?? 0) + 1);
@@ -328,11 +348,11 @@ describe("NavyHeroSlider slice", () => {
       ).toEqual([1, 5]);
     });
 
-    it("advances one slide every 3000ms on its own", async () => {
+    it("advances one slide every DELAY_MS on its own", async () => {
       vi.useFakeTimers();
       const container = mountSlider();
       expect(positions(container)[0]).toBe(0);
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(DELAY_MS);
       await tick();
       // Everything shifted left by one: slide 1 is now off to the left.
       expect(positions(container)).toEqual([-1, 0, 1, 2, 3, 4]);
@@ -353,26 +373,34 @@ describe("NavyHeroSlider slice", () => {
       // reference lets a scheduled tick land ~1s after a click and jump again
       // unasked. This build restarts the delay instead.
       //
-      // The assertion that matters is the NEGATIVE one: at 2900ms after the
-      // click the original tick's slot (3000ms from mount) has already passed,
-      // and nothing may have moved.
+      // The assertion that matters is the NEGATIVE one, and it is only worth
+      // anything if the clock is past the ORIGINAL tick's slot when it runs.
+      // Spelled as DELAY_MS arithmetic rather than as the literals this test
+      // used to carry (click at 2000, wait 2900): against a 5000ms delay those
+      // put the check at 4900ms from mount — BEFORE the slot it claims to have
+      // survived — so it would have passed while measuring nothing. The
+      // arithmetic below cannot rot that way at any delay.
+      const CLICK_AT = 2000; // any time strictly inside the first delay
       vi.useFakeTimers();
       const container = mountSlider();
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(CLICK_AT);
       await tick();
-      expect(onScreen(container), "no tick yet at 2000ms").toBe(0);
+      expect(onScreen(container), `no tick yet at ${CLICK_AT}ms`).toBe(0);
 
       (container.querySelector(".w-slider-arrow-right") as HTMLElement).click();
       await tick();
       expect(onScreen(container), "the click itself advances").toBe(1);
 
-      await vi.advanceTimersByTimeAsync(2900);
+      // CLICK_AT + DELAY_MS - 1 from mount: comfortably past the original slot,
+      // and 1ms short of a full delay after the click.
+      await vi.advanceTimersByTimeAsync(DELAY_MS - 1);
       await tick();
-      expect(onScreen(container), "the tick scheduled for 3000ms must not survive the click").toBe(
-        1,
-      );
+      expect(
+        onScreen(container),
+        "the tick scheduled for the original delay must not survive the click",
+      ).toBe(1);
 
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(1);
       await tick();
       expect(onScreen(container), "a full delay after the click, it advances").toBe(2);
     });
@@ -381,16 +409,16 @@ describe("NavyHeroSlider slice", () => {
       // The cheap way to implement the above is to bump the epoch inside step()
       // itself, which also re-keys on every autoplay tick — rebuilding the
       // interval 20 times a minute and making the cadence depend on teardown
-      // ordering. Three unattended ticks must land on a flat 3000ms grid.
+      // ordering. Three unattended ticks must land on a flat DELAY_MS grid.
       vi.useFakeTimers();
       const container = mountSlider();
       for (const expected of [1, 2, 3]) {
-        await vi.advanceTimersByTimeAsync(2999);
+        await vi.advanceTimersByTimeAsync(DELAY_MS - 1);
         await tick();
         expect(onScreen(container), `no early tick before ${expected}`).toBe(expected - 1);
         await vi.advanceTimersByTimeAsync(1);
         await tick();
-        expect(onScreen(container), `tick ${expected} on the 3000ms grid`).toBe(expected);
+        expect(onScreen(container), `tick ${expected} on the DELAY_MS grid`).toBe(expected);
       }
     });
 
@@ -402,7 +430,7 @@ describe("NavyHeroSlider slice", () => {
       vi.useFakeTimers();
       const container = mountSlider();
       for (let i = 0; i < 6; i++) {
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(DELAY_MS);
         await tick();
       }
       const after = positions(container);
@@ -431,7 +459,7 @@ describe("NavyHeroSlider slice", () => {
         (el) => el.getAttribute("style") ?? "",
       );
       const none = styles.filter((s) => s.includes("transition: none"));
-      const tweened = styles.filter((s) => s.includes("transform 500ms ease"));
+      const tweened = styles.filter((s) => s.includes(`transform ${SLIDE_MS}ms ${EASE}`));
       expect(none).toHaveLength(1);
       expect(tweened).toHaveLength(5);
     });
