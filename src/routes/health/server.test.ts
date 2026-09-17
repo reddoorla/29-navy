@@ -78,7 +78,7 @@ describe("/health GET", () => {
     expect(mocks.getRepository).not.toHaveBeenCalled();
   });
 
-  it("maps forms env presence to booleans and always declares testMode forwarding", async () => {
+  it("maps forms env presence to booleans and declares NO testMode forwarding", async () => {
     mocks.getRepository.mockResolvedValue({});
     mocks.privateEnv.FORMS_INGEST_URL = "https://ingest.example/submit";
     // FORMS_INGEST_TOKEN intentionally left unset.
@@ -88,11 +88,20 @@ describe("/health GET", () => {
       ingestUrl: true,
       ingestToken: false,
       turnstile: true,
-      // Not env-derived: this deploy's contact buildPayload forwards the
-      // marker, so the declaration is unconditional. The fleet form-e2e probe
-      // refuses to submit to any site whose /health omits it.
-      testMode: true,
+      // Not env-derived, and false: this site has no form (the starter's
+      // /contact route was deleted in #32), so nothing forwards the marker.
+      // The fleet form-e2e probe submits only where this is strictly `true`.
+      testMode: false,
     });
+  });
+
+  it("never declares testMode forwarding, whatever the forms env holds", async () => {
+    mocks.getRepository.mockResolvedValue({});
+    mocks.privateEnv.FORMS_INGEST_URL = "https://ingest.example/submit";
+    mocks.privateEnv.FORMS_INGEST_TOKEN = "secret";
+    mocks.publicEnv.PUBLIC_TURNSTILE_SITE_KEY = "0x_site_key";
+    const { body } = await callHealth();
+    expect(body.forms.testMode).toBe(false);
   });
 
   it("never POSTs to the ingest (public, unauthenticated endpoint)", async () => {

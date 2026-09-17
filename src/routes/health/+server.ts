@@ -39,13 +39,15 @@ export const GET: RequestHandler = async ({ fetch }) => {
     // Trimmed to match the widget's own check (see TurnstileWidget.svelte) so a
     // stray-whitespace value reports dark here too, not falsely present.
     turnstile: !!publicEnv.PUBLIC_TURNSTILE_SITE_KEY?.trim(),
-    // Declares that this deploy's contact form forwards the `testMode` marker
-    // to central ingest (contact/+page.server.ts buildPayload) — unconditional
-    // because the forwarding ships in the same deploy as this flag. The fleet
-    // form-e2e probe preflights /health and refuses to submit without this
-    // declaration, so it must NEVER be copied to a site whose form does not
-    // forward the marker (the probe would land as a real lead).
-    testMode: true,
+    // Declares whether this deploy has a form that forwards the `testMode`
+    // marker to central ingest. The fleet form-e2e probe preflights /health and
+    // submits only where this is strictly `true`. 29 Navy has NO form: the
+    // starter's /contact route was deleted in #32 (src/routes/routes.test.ts
+    // pins that), so this is false. Kept explicit rather than omitted — the
+    // probe reads absent and false the same way, but `false` states it. Never
+    // flip it to true without a form action that actually forwards the marker,
+    // or the probe's submission lands as a real lead.
+    testMode: false,
   };
   // The downstream function-health audit treats an unreachable endpoint as "not
   // present"; since we are inside the handler, the function ran, so ok is false

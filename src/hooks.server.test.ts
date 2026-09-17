@@ -21,7 +21,7 @@ describe("handle", () => {
   });
 
   it("tells crawlers not to index the Netlify host", async () => {
-    const response = await respond("https://29-navy.netlify.app/contact");
+    const response = await respond("https://29-navy.netlify.app/health");
 
     expect(response.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
   });
@@ -33,7 +33,7 @@ describe("handle", () => {
   });
 
   it("leaves the real domain indexable", async () => {
-    for (const href of ["https://29navy.com/", "https://www.29navy.com/contact"]) {
+    for (const href of ["https://29navy.com/", "https://www.29navy.com/health"]) {
       const response = await respond(href);
       expect(response.headers.get("X-Robots-Tag")).toBeNull();
     }

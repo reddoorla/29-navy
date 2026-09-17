@@ -11,7 +11,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   // Deindex the Netlify copy of the site (see $lib/indexability). This covers
   // the responses this hook actually reaches — everything rendered by the
-  // function, including /contact and the two crawl-signal endpoints. Pages the
+  // function, including /health and the two crawl-signal endpoints. Pages the
   // build prerendered to static HTML are served by the CDN without running
   // this hook, and their bytes are identical on both hosts, so they carry no
   // host-specific header: robots.txt `Disallow: /` is what fences those.
