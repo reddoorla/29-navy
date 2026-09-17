@@ -1879,6 +1879,8 @@ session).
 
 ## 2026-09-16 — The staging host invited its own indexing, and prerendering is why the body could not say otherwise (#33 → #38, `3d94c9d`; #32 half, `fix/contact-not-indexable`)
 
+> Superseded in part by 2026-09-17 — The cutover already happened, and nothing in the fleet was told.
+
 `29-navy.netlify.app` served `Disallow: /dev/ … Sitemap: https://29-navy.netlify.app/sitemap.xml`, `sitemap.xml` carried `<loc>https://29-navy.netlify.app/</loc>`, and the home page answered with no `x-robots-tag` at all. The client's real site is live at `29navy.com` with substantially the same copy, so the staging copy was free to compete with it for the client's own words.
 
 The part worth keeping is why editing the robots body would not have fixed this. Both crawl-signal endpoints were `prerender = true`, and a prerendered `robots.txt` bakes ONE origin — `kit.prerender.origin`, set from Netlify's `URL` env in `svelte.config.js` — into one file at build time. Netlify then serves those same bytes on **every** host the build is reachable from. A host-derived rule computed at build time therefore lands on the client's domain too, which is exactly the trap #33 named: a noindex that outlives the cutover silently delists the launched site, a far worse failure than the one being prevented. So the fix had to begin with `prerender = false` on both endpoints; only then is `url.origin` the host that actually asked. A robots.txt is one request per crawler visit — the function invocation is not worth the trap that prerendering reintroduces. Evidence the flip took: after `vite build`, `build/` no longer contains `robots.txt` or `sitemap.xml` at all.
@@ -1892,3 +1894,164 @@ Six assertions were shown failing against unfixed source before anything changed
 **#32 is deliberately only half-done, and the remaining half is not mine.** `/contact` is now disallowed on the client's domain, which is correct under every option the issue lists. But that line does nothing about the half that actually matters: spam bots don't read robots.txt, and the route still accepts posts into central ingest. Deleting the route or building it out for real is a decision about the client's site, so #32 stays open for the operator. One thing found while looking, which belongs with that decision: `/health` declares `forms.testMode: true`, and the fleet `form-e2e` probe preflights exactly that declaration before it will submit — so if `/contact` is deleted, that flag has to go in the same change or the probe aims at a route that no longer exists. `CONTACT_PATHS` in the central audit is `["/contact", "/"]`. An earlier entry in this journal records the Airtable row as `Status: building`, which is what keeps fleet sweeps off this site for now; that was not re-verified today.
 
 Still owed at the domain cutover, and not automatable from here: fetch `/robots.txt` and the home page's headers on `29navy.com` and confirm nothing says noindex. Nothing shipped here can cause that failure — the predicate cannot match the client's domain — but it is still the right check to run.
+
+## 2026-09-17 — The cutover already happened, and nothing in the fleet was told (#41, #42, #43, `fix/a11y-loop-timeout-and-review`)
+
+A review session, asked for on the premise that this site "should now be fully
+part of the fleet". Most of it is. The parts that are not share one cause, and
+it is not a missing config line.
+
+**29navy.com is this repo.** Netlify project `29-navy`
+(`0627e670-a816-48b2-bd32-b2e52c8d2103`) carries `custom_domain: 29navy.com`,
+built from `reddoorla/29-navy` on `main`, last published `2026-09-17T16:58:35Z`
+— PR #40, today. `https://29navy.com/` and `https://29-navy.netlify.app/` return
+**byte-identical HTML, 45216 bytes**, `__sveltekit` present, `data-wf-site`
+absent. `www.29navy.com` 301s to the apex.
+
+This corrects the entry directly above. That one reads "The client's real site
+is live at `29navy.com` with substantially the same copy, so the staging copy
+was free to compete with it" and closes with work "still owed at the domain
+cutover". Both sentences treat `29navy.com` as the Webflow reference and the
+cutover as future. It is neither. The belief was reasonable on 2026-09-16 and I
+cannot date the cutover from here — Netlify's API gives no domain-attachment
+timestamp — so what is recorded is what is measurable now, not a guess about
+when it stopped being true.
+
+**The check that entry said was still owed has now been run, and it passes.**
+On `29navy.com`: `robots.txt` is the ordinary one (`Disallow: /dev/`,
+`/slice-simulator`, `/preview/`, `Sitemap: https://29navy.com/sitemap.xml`), and
+neither `/` nor `/robots.txt` carries an `x-robots-tag`. On the mirror, `/health`
+and `/robots.txt` both answer `x-robots-tag: noindex, nofollow` and `robots.txt`
+is `Disallow: /`. The `isNetlifyHost` predicate does exactly what #38 claimed
+and, as designed, nothing at all to the client's domain. That is the one part of
+this entry that is a clean confirmation rather than a finding.
+
+### The finding: a live client site that no fleet sweep can see
+
+`forms-notify-target 29-navy` → `Status: building`. `src/inventory/airtable.ts`
+filters `ACTIVE_STATUSES.has(status) && !isPreLaunch(status)`, and
+`PRE_LAUNCH_STATUSES` contains `building`. That provider is `--fleet airtable`,
+which is the inventory for **all five** nightly fleet workflows — `fleet-smoke`,
+`fleet-form-e2e`, `fleet-lighthouse`, `fleet-prismic-drift`, `fleet-security`.
+So the site has been live on the client's own domain with **zero** nightly
+coverage.
+
+Worth being precise about what that does and does not mean, because "not in the
+fleet" overstates it. Everything per-repo is running and correct: CI on every
+push (`ci / ci` required, ruleset `main: reviewed changes only` active with an
+**empty** bypass list, `enforce_admins`, no force pushes), Renovate authoring as
+`app/reddoor-renovate` on `0 */12 * * *`, GitHub secret scanning and push
+protection both enabled. Everything central is pre-wired too:
+`PRISMIC_TOKEN_29_NAVY` exists as a reddoor-maintenance secret and has its env
+line at `fleet-prismic-drift.yml:117`. One field gates all of it.
+
+And flipping that field is not a one-liner. `preflight 29-navy` → 2 fail, 2
+warn: no recipients and no point of contact (skipped at bootstrap rather than
+guessed, which was right), no Header image, no Lighthouse scores, and a
+maintenance-day anchor of **2025-01-22** — over 13 months stale, which means
+`report --due` would draft a back-dated overdue report to a client the moment
+Status becomes `maintained`. Filed as #41 with the ordering that avoids each.
+
+The general shape, which is the part worth keeping: **the fleet's enrolment
+switch is a field in Airtable, and nothing in the repo, the deploy or the DNS
+observes it.** A site can go live in every sense a visitor can check while the
+one record that decides whether anyone watches it still says `building`. Nothing
+here failed; the launch step simply has no mechanical relationship to the
+cutover, so it can be skipped without anything going red.
+
+### The reference died, and the guard held
+
+`matching/harness.json` has `ref: https://www.29navy.com` and
+`refMark: data-wf-site="61411d5add9b561004cfbf8b"`. `checkRef()` now returns
+`ok: false — GET https://www.29navy.com/ → HTTP 301, expected 200`. Three
+independent guards would each have caught it: the redirect check, the missing
+`refMark`, and `candMark` being present in the reference body. The Phase 0/1
+work that built them was written for exactly this event, and the event happened.
+Recording that as a win, because the alternative outcome — a gate quietly
+comparing the build against itself — is a false green over the whole matching
+programme.
+
+One gap in the set, inert here only because the redirect fires first:
+`selfHosts` lists `29-navy.netlify.app` and **not** `29navy.com`, which is now
+equally our own build.
+
+The cost is real: `next.mjs` reports `SCORE 16/20`, backlog empty, four
+operator-ACCEPTED failures (#8), and names Phases 5 (states) and 6 (adversarial
+review) as what remains — and those need a live reference there no longer is.
+The offline capture in `matching/spec/` survives with hashes in `CAPTURE.md`.
+Whether to serve that locally and repoint `ref` at it, or close the harness out
+at 16/20, is an operator call under matching rules 3 and 5. #43.
+
+### The build hook exists and has never fired
+
+`listSiteBuildHooks` returns one hook, `Prismic publish` → `main`, created
+`2026-09-16T00:24:58Z`. `listSiteDeploys` returns 77 deploys and **not one of
+them is hook-triggered** — every deploy since the hook was created carries a git
+commit title and a `commit_ref`. The operator-only half of #31 (paste the hook
+URL into Prismic → Settings → Webhooks) has no evidence behind it.
+
+The bookkeeping is how it stayed invisible: #31 was closed at
+`2026-09-16T00:55:22Z`, and its only comment — posted at `01:11:11Z`, **sixteen
+minutes later** — ends "Leaving this issue open until that grep returns
+non-zero." An issue that states its own exit criterion and is closed without it
+is the repo's opening rule landing on the tracker instead of on a test: the
+close is the absence of an error, not an artefact only a working system
+produces. #42. This now matters more than it did when #31 was written, because
+production is the client's own domain: a publish that never lands is
+client-visible today.
+
+### What `pnpm verify` actually said, and the one thing fixed here
+
+Red. `VERIFY_EXIT=1` — and the background task notification reported "exit code
+0", which is the wrapping shell's, exactly as the standing note says. Lint,
+svelte-check, build and the axe audit passed; 62 unit test files / 554 tests
+passed; one Playwright test failed:
+`tests/a11y/home.spec.ts › home at 1440px › every resident popup, open, with
+motion allowed`, timeout at 30s.
+
+Not a defect in the page. The identical 390px test **passed at 29.9s** — 0.1s of
+headroom — and `every floor tab` passed at 26.0s, both against the same 30s
+default. Re-run alone the pair passes in 57.2s, exit 0. Seven popups × (1.0s of
+fixed waits + a full axe pass) against a fixed 30s budget was always going to be
+decided by machine load; the floor-tab test was two seconds of contention from
+the same fate.
+
+Both looping tests now call `test.setTimeout(5 * 60_000)`, matching the number
+and the reasoning the fleet's own generated a11y spec already uses for the same
+structure. **Proven by mutation, not by a green:** set to `3_000` the pair fails
+with `Test timeout of 3000ms exceeded`, so the constant is the binding budget
+and not an ignored line. A real hang still fails, five minutes later.
+
+Honest accounting: this was the only defect the review could fix in-repo. The
+other three findings are all decisions or operator actions, which is why they
+are issues rather than commits.
+
+### Cleanly wired, verified rather than assumed
+
+`package.json#name` = `29-navy`; the `your-prismic-repo-name` sentinel is gone
+from `slicemachine.config.json`; `ci.yml` `netlify-site: "29-navy"` on
+`reddoorla/.github@v1.4.1`; `prismic-models.yml` present with the repo's
+`PRISMIC_WRITE_TOKEN` set; `.claude/settings.json` carries the reuse hook;
+`docs/COMPONENTS.md` current (`capability-index.test.ts` is inside the 554).
+
+One of those deserves its own line because the obvious reading is wrong. The
+axe audit prints `0 violations across 2 routes` while `reddoor.a11yRoutes` is
+`["/"]`, which looks exactly like the key being ignored. It is not — the count
+is the known cosmetic bug (reddoor-maintenance #697). Captured the generated
+spec mid-run to settle it rather than reasoning about it:
+
+```
+const pages = [{"path":"/dev/a11y-fixtures",…},{"path":"/dev/animate-in",…},{"path":"/","name":"/"}];
+```
+
+Three routes, and the site's real home page is one of them. The poller that
+caught it needed `find`, not a glob — zsh aborts a subshell on an unmatched
+`.reddoor-a11y-spec-*` rather than passing it through, which silently killed the
+first attempt on its first iteration.
+
+`reddoor.gateServer` is still unset, so the gates run against `vite dev`. That
+now looks deliberate rather than pending: #37 guards `/dev/*` to 404 in
+production, and the a11y audit, the Lighthouse run, the shared Playwright
+config's readiness probe and the match harness all serve `/dev` routes. Setting
+`gateServer: "preview"` would break all four. Left alone, noted so the next
+session does not "finish" the bootstrap step by switching it.

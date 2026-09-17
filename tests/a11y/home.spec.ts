@@ -31,6 +31,28 @@ import AxeBuilder from "@axe-core/playwright";
  * `no-preference`, with the fade allowed to finish.
  */
 
+/**
+ * BUDGET. Playwright's default per-test timeout is 30s, and it is a per-TEST
+ * budget — the two looping tests below run a full axe pass per interactive
+ * state, so their cost scales with the number of states while the default does
+ * not. Measured 2026-09-17 in one `pnpm verify` (every spec sharing the
+ * machine): "every resident popup" took 31.0s at 1440px and FAILED on timeout,
+ * while the identical 390px test PASSED at 29.9s — 0.1s of headroom — and
+ * "every floor tab" passed at 26.0s. Re-run alone, both popup viewports pass,
+ * 57.2s for the pair, exit 0. So the red was contention against a budget that
+ * was never sized for the loop, not a defect in the page; at 7 popups x (1.0s
+ * of fixed waits + an axe pass) the 30s default was always going to be decided
+ * by machine load.
+ *
+ * The fleet's own generated a11y spec (@reddoorla/maintenance) reaches this
+ * conclusion in almost these words — "we loop through every configured route in
+ * a single test, so the budget needs to scale" — and sets five minutes. Match
+ * that number rather than inventing a tighter one: this gate exists to find
+ * violations, and a timeout is not one. A real hang still fails, five minutes
+ * later.
+ */
+const LOOPED_AUDIT_TIMEOUT_MS = 5 * 60_000;
+
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const FLOOR_TRIGGER = '[aria-controls^="lofts-floor-panel-"]';
 const DIALOG_TRIGGER = 'a[aria-haspopup="dialog"]';
@@ -54,6 +76,7 @@ for (const width of [1440, 390]) {
     });
 
     test("every floor tab, hovered and opened", async ({ page }) => {
+      test.setTimeout(LOOPED_AUDIT_TIMEOUT_MS);
       await page.goto("/", { waitUntil: "networkidle" });
       const triggers = page.locator(FLOOR_TRIGGER);
       const n = await triggers.count();
@@ -72,6 +95,7 @@ for (const width of [1440, 390]) {
     });
 
     test("every resident popup, open, with motion allowed", async ({ page }) => {
+      test.setTimeout(LOOPED_AUDIT_TIMEOUT_MS);
       await page.emulateMedia({ reducedMotion: "no-preference" });
       // WAIT FOR HYDRATION. The triggers are `<a href="#">` server-side; their
       // handler is attached on hydrate. A click that lands before that follows
