@@ -238,12 +238,19 @@ describe("NavyHeroSlider slice", () => {
 
   describe("motion", () => {
     // The reference declares data-delay="3000", data-duration="500",
-    // data-easing="ease", data-infinite="true". The CURVE below is still the
-    // reference's `ease`; the two timings are NOT — they are the Reddoor site's,
-    // at the client's request, lifted as a matched pair from
-    // reddoor-website `src/lib/components/Slideshow/Slideshow.svelte`
-    // (`transitionMs = 1600`, `interval = 5000`). See the component's own
-    // Motion block and matching/LEDGER.md.
+    // data-easing="ease", data-infinite="true". NONE of the three still holds.
+    // The timings are Reddoor's slideshow props (`transitionMs = 1600`,
+    // `interval = 5000`, reddoor-website Slideshow.svelte) and the curve is
+    // Reddoor's HOUSE token `--transition-fast-slow` — `ease-fast-slow`,
+    // src/app.css:39 — which is NOT the same shape as the `ease` both the
+    // reference and Reddoor's own slideshow use. See the component's Motion
+    // block for why the house token is the right match and the slideshow's is
+    // not, and matching/LEDGER.md for the deviation record.
+    //
+    // Asserted as the token, not as `cubic-bezier(0.5, 0, 0, 1)`: the point of
+    // referencing app.css is that this slice cannot drift from the rest of the
+    // site, and a test pinning the resolved value would pass through exactly
+    // the drift it exists to catch.
     //
     // Named here rather than inlined so the pair has ONE home in this file: the
     // previous spelling repeated `3000` in nine places, and a timing change
@@ -251,6 +258,7 @@ describe("NavyHeroSlider slice", () => {
     // still passing for the wrong reason.
     const SLIDE_MS = 1600;
     const DELAY_MS = 5000;
+    const EASE = "var(--transition-fast-slow)";
     const xs = (container: Element) =>
       [...container.querySelectorAll(".w-slide")].map((el) => {
         const m = /translateX\((-?\d+)%\)/.exec(el.getAttribute("style") ?? "");
@@ -451,7 +459,7 @@ describe("NavyHeroSlider slice", () => {
         (el) => el.getAttribute("style") ?? "",
       );
       const none = styles.filter((s) => s.includes("transition: none"));
-      const tweened = styles.filter((s) => s.includes(`transform ${SLIDE_MS}ms ease`));
+      const tweened = styles.filter((s) => s.includes(`transform ${SLIDE_MS}ms ${EASE}`));
       expect(none).toHaveLength(1);
       expect(tweened).toHaveLength(5);
     });

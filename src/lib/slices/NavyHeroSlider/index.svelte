@@ -99,26 +99,41 @@
    * result: `.w-slider-mask` is `overflow: hidden` (ref css:1198), so every
    * position outside [0, 1) slide-widths is clipped and cannot differ on screen.
    * Recorded in matching/LEDGER.md. */
-  /* TIMING IS NO LONGER THE REFERENCE'S — it is the Reddoor site's, at the
-   * client's request (Tim Holmes, #worthe-web-maintenance 2026-09-17 20:00:
-   * "it'd be nice if the photos did a nice slow ease-in at the end"). Both
-   * numbers are lifted from ONE component so they stay a matched pair —
-   * reddoor-website `src/lib/components/Slideshow/Slideshow.svelte`, props
-   * `transitionMs = 1600` (line 13) and `interval = 5000` (line 12).
+  /* MOTION IS NO LONGER THE REFERENCE'S — it is the Reddoor site's house
+   * motion, at the client's request (Tim Holmes, #worthe-web-maintenance
+   * 2026-09-17 20:00: "it'd be nice if the photos did a nice slow ease-in at
+   * the end"), with the operator naming `ease-fast-slow` as the curve to match.
    *
-   * THE CURVE DID NOT CHANGE, AND DID NOT NEED TO. Reddoor's slideshow eases
-   * with `cubic-bezier(0.25, 0.1, 0.25, 1)` (Slideshow.svelte:178) and that IS
-   * the CSS keyword `ease`, per the spec's own definition — the same keyword
-   * the reference already specified and this file already used. So "match the
-   * Reddoor ease" is entirely a DURATION change: identical curve, 3.2x the
-   * time to play out. At 500ms the deceleration tail is over before the eye
-   * resolves it; at 1600ms it is the whole impression.
+   * THE CURVE IS THE HOUSE TOKEN, NOT REDDOOR'S SLIDESHOW. This distinction
+   * cost a wrong answer, so it is written down. Reddoor has TWO curves:
    *
-   * The delay moves with it rather than staying at the reference's 3000. It has
-   * to: a 1600ms slide inside a 3000ms delay leaves 1400ms of stillness, so the
-   * strip would be in motion more than half the time — which matches neither
-   * the reference (500 in 3000, 17% moving) nor Reddoor (1600 in 5000, 32%).
-   * Holding one number and moving the other lands on a cadence nobody chose.
+   *   - its Slideshow component eases with `cubic-bezier(0.25, 0.1, 0.25, 1)`
+   *     (reddoor-website Slideshow.svelte:178) — which IS the CSS keyword
+   *     `ease`, the very keyword the Webflow reference already specified here;
+   *   - its HOUSE curve is `--transition-fast-slow: cubic-bezier(0.5, 0, 0, 1)`
+   *     (Tailwind key `fast-slow`, hence the class `ease-fast-slow`), applied
+   *     to `body` and to the photo blur-up, and live on `:root` at
+   *     reddoorla.com today.
+   *
+   * Matching slideshow-to-slideshow looks like the careful answer and is the
+   * wrong one: it lands on `ease`, which is what this slice already had, so
+   * "match the Reddoor ease" would have changed no curve at all. The house
+   * token is the one that reads as Reddoor, and it is a genuinely different
+   * shape — measured over 1600ms, at t=200 `ease` has travelled 136.9/1000
+   * while fast-slow has travelled 29.4. Slow start, quick middle, long settle,
+   * against `ease`'s fast start and shorter settle.
+   *
+   * `--transition-fast-slow` IS ALREADY IN THIS REPO — src/app.css:39, shipped
+   * by the reddoor-starter. Referenced rather than re-typed as a literal, so
+   * this slice cannot drift from the token the rest of the site uses.
+   *
+   * The two timings are Reddoor's slideshow props, taken as a matched pair from
+   * one component: `transitionMs = 1600` (Slideshow.svelte:13) and
+   * `interval = 5000` (Slideshow.svelte:12). The delay moves with the duration
+   * rather than staying at the reference's 3000 — a 1600ms slide inside a
+   * 3000ms delay leaves 1400ms of stillness, putting the strip in motion 53% of
+   * the time against the reference's 17% and Reddoor's 32%. Holding one number
+   * and moving the other lands on a cadence nobody chose.
    *
    * Recorded as a deliberate deviation in matching/LEDGER.md. Note it can no
    * longer be gate-checked against the reference at all: 29navy.com now serves
@@ -127,6 +142,9 @@
    * status is unverified-against-reference, not verified. */
   const SLIDE_MS = 1600; // reddoor-website Slideshow.svelte:13 `transitionMs`
   const DELAY_MS = 5000; // reddoor-website Slideshow.svelte:12 `interval`
+  /** The house curve, by token rather than by value — src/app.css:39, the same
+   *  `cubic-bezier(0.5, 0, 0, 1)` Reddoor calls `ease-fast-slow`. */
+  const EASE = "var(--transition-fast-slow)";
 
   const count = $derived(slides.length);
   /** Each slide's position in slide-widths. 0 is on screen, -1 is just off to
@@ -221,7 +239,7 @@
     const motion =
       teleported.includes(i) || prefersReducedMotion()
         ? "transition: none"
-        : `transition: transform ${SLIDE_MS}ms ease`;
+        : `transition: transform ${SLIDE_MS}ms ${EASE}`;
     const background = url ? `background-image: url("${url}"); ` : "";
     // MINUS i, and that subtraction is the whole slider.
     //

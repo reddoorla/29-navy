@@ -2174,7 +2174,7 @@ rather than merely answering a test press — those look identical from outside,
 and the difference is the whole of #31. #42 stays open for the one remaining
 artefact: a publish that reaches production with no git push behind it.
 
-## 2026-09-17 (evening) — "Match the Reddoor ease" was a duration change, and the curve was already right (`feat/hero-ease-matches-reddoor`)
+## 2026-09-17 (evening) — The careful answer to "match the Reddoor ease" was the wrong one (`feat/hero-ease-matches-reddoor`, #46)
 
 Tim Holmes, `#worthe-web-maintenance`, 20:00: _"On the homepage slideshow it'd
 be nice if the photos did a nice slow ease-in at the end."_ Relayed with the
@@ -2184,41 +2184,54 @@ measure against.
 
 ### The finding, which is the whole entry
 
-**The curve was already identical, and changing it would have been the wrong
-fix.** Reddoor's slideshow eases with `cubic-bezier(0.25, 0.1, 0.25, 1)`
-(reddoor-website `src/lib/components/Slideshow/Slideshow.svelte:178`). That is
-the CSS keyword **`ease`** — which the Webflow reference already specified
-(`data-easing="ease"`) and which this slice already used. What differs between
-the two sites is time: Reddoor runs its slide over `transitionMs = 1600`
-(Slideshow.svelte:13), this slice ran it over the reference's 500.
+**Reddoor has two curves, and the careful comparison picks the wrong one.**
 
-So the request resolved to a duration change with the curve untouched:
-**500 → 1600ms**, identical bezier, 3.2× the time to play out.
+- Its Slideshow component eases with `cubic-bezier(0.25, 0.1, 0.25, 1)`
+  (reddoor-website `src/lib/components/Slideshow/Slideshow.svelte:178`). That is
+  the CSS keyword `ease` — which the Webflow reference already specified
+  (`data-easing="ease"`) and this slice already used.
+- Its **house** curve is `--transition-fast-slow: cubic-bezier(0.5, 0, 0, 1)`,
+  Tailwind key `fast-slow`, hence the class **`ease-fast-slow`**. It is on
+  `body` and on the photo blur-up, and it is live on `:root` at reddoorla.com.
 
-Had "match the ease" been read as a curve problem — the obvious reading, and the
-one the words invite — the fix would have been to invent an easing nobody asked
-for, leave the duration at 500, and produce something that looked like neither
-site. The instruction named the wrong lever, and only reading Reddoor's source
-rather than eyeballing its render caught that.
+Comparing the two sites' slideshows is the obvious rigorous move, and it lands
+on `ease` — which this slice already had. So the first answer to "match the
+Reddoor ease" was _"the curve is already identical; this is purely a duration
+change."_ That sentence is true about the components compared and false about
+what was asked. The operator's answer was one word — `ease-fast-slow` — and it
+was the house token all along.
 
-**Measured, not taken from the spec.** Chrome's computed style echoes whichever
-spelling you wrote, so `ease` reads back as `ease` and a string comparison
-proves nothing. Two elements animated over the same 1600ms and sampled at
-identical clock positions, with `ease-out` as a control that must differ:
+**Why the wrong answer was convincing.** It came with a measurement: `ease` and
+`cubic-bezier(0.25, 0.1, 0.25, 1)` sampled identical at every clock position,
+with `ease-out` as a control that differed, so the instrument was demonstrably
+working. All of that was correct. None of it addressed whether the Slideshow
+component was the right thing to compare against, and a measurement cannot tell
+you that — **rigour inside the wrong frame reads exactly like rigour.** The
+honest lesson is not "measure more"; it is that choosing the comparand is a
+judgment that measurement cannot rescue, and the cheap fix was to ask which
+curve was meant before building a table about one of them.
 
-| t (ms) |  `ease` | `cubic-bezier(.25,.1,.25,1)` | `ease-out` control |
-| -----: | ------: | ---------------------------: | -----------------: |
-|    100 |  45.575 |                       45.575 |            102.133 |
-|    400 | 408.511 |                      408.511 |            378.138 |
-|    800 | 802.403 |                      802.403 |            684.643 |
-|   1200 | 960.459 |                      960.459 |            906.535 |
-|   1500 | 997.834 |                      997.834 |            993.098 |
+**The two shapes, measured over 1600ms:**
 
-Identical at every sample, control differs at every one. That table is also the
-clearest answer to _why duration was the lever_: `ease` covers **80% of the
-distance in the first half**, then crawls 802 → 960 → 998 over the remaining
-800ms. The crawl is the thing Tim is describing. At 500ms it lasts 250ms and the
-eye never resolves it; at 1600ms it lasts 800ms and is the whole impression.
+| t (ms) | `ease` | `ease-fast-slow` |
+| -----: | -----: | ---------------: |
+|    200 |  136.9 |             29.4 |
+|    400 |  408.5 |            224.6 |
+|    800 |  802.4 |            850.8 |
+|   1200 |  960.5 |            973.8 |
+|   1500 |  997.8 |            998.6 |
+
+`ease` leaves fast and settles; `fast-slow` barely moves for the first fifth,
+crosses over around 800ms, then settles longer. Slow start, quick middle, long
+settle — the reason it reads as Reddoor rather than as a browser default.
+
+**The token was already in this repo**, at `src/app.css:39`, shipped by the
+reddoor-starter alongside `--transition-in-expo` and `--transition-out-expo`.
+The slice references `var(--transition-fast-slow)` instead of re-typing
+`cubic-bezier(0.5, 0, 0, 1)`, so it cannot drift from the rest of the site. That
+is the repo's own reuse rule landing a fourth time: the answer was sitting in
+`src/app.css` before any of this was written, and neither the duration work nor
+the curve work went looking there first.
 
 ### The delay had to move with it
 
@@ -2266,20 +2279,27 @@ the deviation is recorded there too rather than only here.
 
 `pnpm build && pnpm preview`, per the repo's own rule, because the shipped
 bundle is where both scroll-driven runway stages once rendered frame 0 while dev
-looked fine:
+looked fine. It mattered more than usual here: the slice hands the browser a
+`var()` inside an inline `transition` shorthand, and an unresolved custom
+property in that position fails **silently** — the declaration is dropped and
+the slide simply snaps, with nothing in the console.
 
+- `--transition-fast-slow` on `:root` of the built page: `cubic-bezier(.5, 0, 0, 1)`.
 - Applied motion, read off a `.w-slide` after a real arrow click:
   `transition-property: transform`, `transition-duration: **1.6s**`,
-  `transition-timing-function: **ease**`.
-- A wrinkle worth knowing, since it looks like the change half-landed: the raw
-  `style` attribute reads back as `transition: transform 1600ms` with **no
-  easing at all**. Chrome drops `ease` when reserializing the shorthand because
-  it is CSS's default timing function. The computed value is `ease`; a grep of
-  the attribute would say otherwise.
+  `transition-timing-function: **cubic-bezier(0.5, 0, 0, 1)**` — resolved, and
+  asserted to be something other than `ease` rather than merely "present".
 - Autoplay cadence, timed from page state rather than from the source constant:
-  ticks at **4601 / 9602 / 14601ms**, gaps of **5001** and **4999ms**. A flat
-  5000ms grid. (The first is short only because observation started after
-  hydration.)
+  ticks at **3361 / 8360 / 13362ms**, gaps of **4999** and **5002ms**. A flat
+  5000ms grid.
+
+A side effect worth noting, because the earlier `ease` version of this change
+had the opposite problem: the raw `style` attribute now reads
+`transition: transform 1600ms var(--transition-fast-slow)`, so it says what it
+does. With the keyword it read `transition: transform 1600ms` and nothing else —
+Chrome drops `ease` when reserializing the shorthand, because it is CSS's
+default timing function, so a grep of the attribute looked like the easing had
+gone missing when it had not.
 
 A first attempt at that cadence measurement read 2177ms and was wrong — it began
 mid-cycle, after an arrow click earlier in the same page had already restarted

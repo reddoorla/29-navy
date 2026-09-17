@@ -587,7 +587,7 @@ gate-checked at all.** Recorded here because the close-out entry above stops the
 programme; it does not stop the site changing, and a deviation decided after the
 ledger closes is exactly the one a later reader will not otherwise find.
 
-### [deviation] Slide duration 500 → 1600ms, autoplay delay 3000 → 5000ms
+### [deviation] Slide 500 → 1600ms, delay 3000 → 5000ms, curve `ease` → `ease-fast-slow`
 
 **Client request, not a measurement.** Tim Holmes in `#worthe-web-maintenance`,
 2026-09-17 20:00: _"On the homepage slideshow it'd be nice if the photos did a
@@ -595,43 +595,53 @@ nice slow ease-in at the end."_ Relayed with the instruction that the ease match
 the Reddoor site.
 
 The reference's slider element declares `data-duration="500"`,
-`data-delay="3000"`, `data-easing="ease"` (`matching/spec/index.html`). Two of
-those three no longer hold.
+`data-delay="3000"`, `data-easing="ease"` (`matching/spec/index.html`). **None
+of the three still holds.**
 
-**The curve did NOT change, and this is the part worth keeping.** Reddoor's
-slideshow eases with `cubic-bezier(0.25, 0.1, 0.25, 1)`
-(reddoor-website `src/lib/components/Slideshow/Slideshow.svelte:178`), and that
-is the CSS keyword **`ease`** — the spec defines `ease` as exactly that curve.
-It is the keyword the Webflow reference already specified and the one this slice
-already used. So "match the Reddoor ease" turned out to be a pure DURATION
-change: identical curve, 3.2× the time to play out. At 500ms the deceleration
-tail is over before the eye resolves it; at 1600ms it is the whole impression.
+**THE CURVE CHANGED TOO, and the first answer here had it wrong.** Recorded as
+a correction rather than quietly fixed, because the wrong answer was the careful
+one and the next person will reach for it too.
 
-Had this been taken as a curve problem, the fix would have been to invent an
-easing nobody asked for and leave the duration — which would not have looked
-like the Reddoor site at all.
+Reddoor has **two** curves:
 
-**Measured rather than asserted from the spec**, because Chrome's computed style
-preserves whichever spelling you wrote (`ease` reads back as `ease`), so string
-comparison cannot settle it. Two elements animated over the same 1600ms and
-sampled at identical clock positions, `translateX(0 → 1000px)`, with `ease-out`
-as a control that must and does differ:
+- its Slideshow component eases with `cubic-bezier(0.25, 0.1, 0.25, 1)`
+  (reddoor-website `src/lib/components/Slideshow/Slideshow.svelte:178`) — which
+  IS the CSS keyword `ease`, the keyword the Webflow reference already
+  specified here;
+- its **house** curve is `--transition-fast-slow: cubic-bezier(0.5, 0, 0, 1)`,
+  Tailwind key `fast-slow`, hence the class **`ease-fast-slow`**. Applied to
+  `body` and to the photo blur-up, and read live off `:root` at reddoorla.com
+  while writing this.
 
-| t (ms) |  `ease` | `cubic-bezier(.25,.1,.25,1)` | `ease-out` (control) |
-| -----: | ------: | ---------------------------: | -------------------: |
-|    100 |  45.575 |                       45.575 |              102.133 |
-|    400 | 408.511 |                      408.511 |              378.138 |
-|    800 | 802.403 |                      802.403 |              684.643 |
-|   1200 | 960.459 |                      960.459 |              906.535 |
-|   1500 | 997.834 |                      997.834 |              993.098 |
+Matching slideshow-to-slideshow is the obvious careful move and lands on `ease`
+— which this slice already had. That answer concluded "the curve did not need to
+change", which was true of the component compared and false of the request. The
+operator named `ease-fast-slow`, and that is what ships.
 
-Identical at every sample; the control differs at every one, so the instrument
-is measuring something. The same table is the clearest statement of WHY the
-duration was the lever: `ease` covers **80% of the distance in the first half**
-and then crawls 802 → 960 → 998 across the remaining 800ms. That crawl is what
-Tim is asking for. At the reference's 500ms it lasts 250ms; at 1600ms it lasts
-800ms and becomes the whole impression of the move.
+**The two are genuinely different shapes**, measured over 1600ms,
+`translateX(0 → 1000px)`, sampled at identical clock positions:
 
+| t (ms) | `ease` | `ease-fast-slow` |
+| -----: | -----: | ---------------: |
+|    200 |  136.9 |             29.4 |
+|    400 |  408.5 |            224.6 |
+|    800 |  802.4 |            850.8 |
+|   1200 |  960.5 |            973.8 |
+|   1500 |  997.8 |            998.6 |
+
+`ease` leaves fast and settles; `fast-slow` barely moves for the first fifth
+(29.4 against 136.9 at t=200), crosses over around 800ms, and settles longer.
+Slow start, quick middle, long settle — which is why it reads as the Reddoor
+house motion rather than as a generic browser default.
+
+**The token was already in this repo.** `src/app.css:39` ships
+`--transition-fast-slow: cubic-bezier(0.5, 0, 0, 1)`, inherited from the
+reddoor-starter. The slice references `var(--transition-fast-slow)` rather than
+re-typing the literal, so it cannot drift from the rest of the site — and the
+unit test asserts the token spelling for the same reason, since a test pinning
+the resolved value would pass through exactly the drift it exists to catch.
+This is the reuse rule landing again: the answer was in `src/app.css` before any
+of it was written.
 **Both numbers move together, from one component.** `transitionMs = 1600`
 (Slideshow.svelte:13) and `interval = 5000` (Slideshow.svelte:12). Holding the
 reference's 3000ms delay while taking Reddoor's 1600ms slide would leave 1400ms
