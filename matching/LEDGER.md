@@ -499,3 +499,83 @@ measured rather than the synchronous branch the shared config forces.
 The `target-size` violation (the download icon squeezed to an 11.3×50px hit area
 by the electricity and internet popups) was not fixed on its own terms — it went
 away with the anchor. Recorded that way rather than claimed as a fix.
+
+## Close-out — the reference no longer exists, and the harness stops at 16/20 (2026-09-17)
+
+**Operator decision, 2026-09-17: close the matching programme out at 16/20.**
+Recorded here at the moment it was made, per rule 5.
+
+### What the score is at close
+
+`node matching/next.mjs`:
+
+```
+SCORE 16/20 regions passing over 1 of 1 page(s)
+
+  home      16/20
+
+Operator-ACCEPTED failures (left failing on purpose):
+  home @390  "Hover or click on a floor"
+  home @767  "Hover or click on a floor"
+  home @991  "Hover or click on a floor"
+  home @1440 "Hover or click on a floor"
+
+No open geometry failures. 0 declared floor(s) remain.
+```
+
+All four accepted failures are the same deviation at four breakpoints — the
+floor-plan download affordance removed in Phase 10 above, pending the client
+supplying the four real PDFs (reddoorla/29-navy#8). They are a content
+dependency, not a geometry failure, and the restore path is written up there.
+
+### Why the programme stops rather than finishing
+
+`next.mjs` names Phases 5 (interaction states) and 6 (adversarial self-review)
+as what remains. Both measure against a live reference, and **there is no longer
+one.** `matching/harness.json` points `ref` at `https://www.29navy.com`; that
+host now 301s to `29navy.com`, which is this repo's own build served from the
+Netlify project's custom domain:
+
+```
+$ node -e "…checkRef()…"
+REF = https://www.29navy.com
+refMark = data-wf-site="61411d5add9b561004cfbf8b"
+checkRef ok = false
+why: GET https://www.29navy.com/ → HTTP 301, expected 200
+```
+
+**The fail-closed preflight did its job.** Three guards would each have caught
+this independently — the redirect check, the absent `refMark`, and `candMark`
+present in the reference body — so the gate refused rather than comparing the
+build against itself and reporting a perfect score. That is the outcome Phase
+0/1 built those guards for, and it is worth recording as the guard working, not
+merely as the reference dying.
+
+One gap in the guard set, inert here only because the redirect fires first:
+`selfHosts` lists `29-navy.netlify.app` and **not** `29navy.com`, which is now
+equally our own build. Anyone repointing `ref` at the apex would have the
+`refMark` check alone between them and a self-comparison.
+
+### What survives, and what it would take to revive this
+
+The offline capture is intact under `matching/spec/` — `index.html`,
+`29navy-8c2435.shared.46514381b.css` (61786 bytes), fonts, js and photo assets,
+every one hashed in `matching/CAPTURE.md`. Reviving the gate means serving that
+capture locally and repointing `ref` at it.
+
+**That is not a small change, and the reason is the honest part.** A local
+replay is a new reference, so it inherits none of the evidence the live one
+carried: before any gate run against it could count, the replay itself would
+have to be shown to render faithfully enough to measure geometry against — and
+the `refMark` guard, which is what makes a reference trustworthy, would be
+asserting on a file we serve ourselves. Whoever picks this up should budget the
+replay-fidelity proof as the first task, not as a preliminary.
+
+Tracked in reddoorla/29-navy#43.
+
+### What this close-out does NOT assert
+
+It does not assert the build matches the reference in the states Phase 5 would
+have measured, or that Phase 6's adversarial review would have found nothing.
+Those were not run. 16/20 is the score for what was measured, and the four
+regions that were never going to pass are named above.
