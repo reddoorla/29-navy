@@ -75,8 +75,7 @@
 
   /* ---- Motion -------------------------------------------------------------
    *
-   * Every number here is read off the reference's own slider element in
-   * matching/spec/index.html:
+   * The reference's own slider element in matching/spec/index.html declares:
    *
    *     data-delay="3000"  data-duration="500"  data-easing="ease"
    *     data-animation="slide"  data-autoplay="true"  data-infinite="true"
@@ -100,8 +99,34 @@
    * result: `.w-slider-mask` is `overflow: hidden` (ref css:1198), so every
    * position outside [0, 1) slide-widths is clipped and cannot differ on screen.
    * Recorded in matching/LEDGER.md. */
-  const SLIDE_MS = 500; // ref index.html data-duration
-  const DELAY_MS = 3000; // ref index.html data-delay
+  /* TIMING IS NO LONGER THE REFERENCE'S — it is the Reddoor site's, at the
+   * client's request (Tim Holmes, #worthe-web-maintenance 2026-09-17 20:00:
+   * "it'd be nice if the photos did a nice slow ease-in at the end"). Both
+   * numbers are lifted from ONE component so they stay a matched pair —
+   * reddoor-website `src/lib/components/Slideshow/Slideshow.svelte`, props
+   * `transitionMs = 1600` (line 13) and `interval = 5000` (line 12).
+   *
+   * THE CURVE DID NOT CHANGE, AND DID NOT NEED TO. Reddoor's slideshow eases
+   * with `cubic-bezier(0.25, 0.1, 0.25, 1)` (Slideshow.svelte:178) and that IS
+   * the CSS keyword `ease`, per the spec's own definition — the same keyword
+   * the reference already specified and this file already used. So "match the
+   * Reddoor ease" is entirely a DURATION change: identical curve, 3.2x the
+   * time to play out. At 500ms the deceleration tail is over before the eye
+   * resolves it; at 1600ms it is the whole impression.
+   *
+   * The delay moves with it rather than staying at the reference's 3000. It has
+   * to: a 1600ms slide inside a 3000ms delay leaves 1400ms of stillness, so the
+   * strip would be in motion more than half the time — which matches neither
+   * the reference (500 in 3000, 17% moving) nor Reddoor (1600 in 5000, 32%).
+   * Holding one number and moving the other lands on a cadence nobody chose.
+   *
+   * Recorded as a deliberate deviation in matching/LEDGER.md. Note it can no
+   * longer be gate-checked against the reference at all: 29navy.com now serves
+   * THIS build, so checkRef() refuses (reddoorla/29-navy#43). This is the first
+   * motion change made with no reference to measure against, and the honest
+   * status is unverified-against-reference, not verified. */
+  const SLIDE_MS = 1600; // reddoor-website Slideshow.svelte:13 `transitionMs`
+  const DELAY_MS = 5000; // reddoor-website Slideshow.svelte:12 `interval`
 
   const count = $derived(slides.length);
   /** Each slide's position in slide-widths. 0 is on screen, -1 is just off to

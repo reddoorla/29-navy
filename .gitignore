@@ -77,3 +77,6 @@ matching/*.json
 matching/*.png
 
 # end reddoor-maint match-harness
+
+# Playwright MCP writes page snapshots here during interactive browser checks.
+.playwright-mcp/

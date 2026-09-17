@@ -2173,3 +2173,115 @@ It does **not** prove the webhook is subscribed to the document-publish _event_
 rather than merely answering a test press — those look identical from outside,
 and the difference is the whole of #31. #42 stays open for the one remaining
 artefact: a publish that reaches production with no git push behind it.
+
+## 2026-09-17 (evening) — "Match the Reddoor ease" was a duration change, and the curve was already right (`feat/hero-ease-matches-reddoor`)
+
+Tim Holmes, `#worthe-web-maintenance`, 20:00: _"On the homepage slideshow it'd
+be nice if the photos did a nice slow ease-in at the end."_ Relayed with the
+instruction that the ease match the Reddoor site. The first content change to
+this site after launch, and the first of any kind made with no reference left to
+measure against.
+
+### The finding, which is the whole entry
+
+**The curve was already identical, and changing it would have been the wrong
+fix.** Reddoor's slideshow eases with `cubic-bezier(0.25, 0.1, 0.25, 1)`
+(reddoor-website `src/lib/components/Slideshow/Slideshow.svelte:178`). That is
+the CSS keyword **`ease`** — which the Webflow reference already specified
+(`data-easing="ease"`) and which this slice already used. What differs between
+the two sites is time: Reddoor runs its slide over `transitionMs = 1600`
+(Slideshow.svelte:13), this slice ran it over the reference's 500.
+
+So the request resolved to a duration change with the curve untouched:
+**500 → 1600ms**, identical bezier, 3.2× the time to play out.
+
+Had "match the ease" been read as a curve problem — the obvious reading, and the
+one the words invite — the fix would have been to invent an easing nobody asked
+for, leave the duration at 500, and produce something that looked like neither
+site. The instruction named the wrong lever, and only reading Reddoor's source
+rather than eyeballing its render caught that.
+
+**Measured, not taken from the spec.** Chrome's computed style echoes whichever
+spelling you wrote, so `ease` reads back as `ease` and a string comparison
+proves nothing. Two elements animated over the same 1600ms and sampled at
+identical clock positions, with `ease-out` as a control that must differ:
+
+| t (ms) |  `ease` | `cubic-bezier(.25,.1,.25,1)` | `ease-out` control |
+| -----: | ------: | ---------------------------: | -----------------: |
+|    100 |  45.575 |                       45.575 |            102.133 |
+|    400 | 408.511 |                      408.511 |            378.138 |
+|    800 | 802.403 |                      802.403 |            684.643 |
+|   1200 | 960.459 |                      960.459 |            906.535 |
+|   1500 | 997.834 |                      997.834 |            993.098 |
+
+Identical at every sample, control differs at every one. That table is also the
+clearest answer to _why duration was the lever_: `ease` covers **80% of the
+distance in the first half**, then crawls 802 → 960 → 998 over the remaining
+800ms. The crawl is the thing Tim is describing. At 500ms it lasts 250ms and the
+eye never resolves it; at 1600ms it lasts 800ms and is the whole impression.
+
+### The delay had to move with it
+
+`DELAY_MS` 3000 → 5000, which is Reddoor's `interval` (Slideshow.svelte:12) —
+taken from the same component so the pair stays matched. Keeping the reference's
+3000 while taking Reddoor's 1600 would leave 1400ms of stillness between moves:
+the strip in motion **53%** of the time, against the reference's 17% and
+Reddoor's 32%. That is a cadence neither site has and nobody chose. Moving one
+number and holding the other is the version of this change that looks like a
+smaller edit and produces a worse result.
+
+### A test that was correct at 3000 and silently vacuous at 5000
+
+`restarts the full delay when the visitor navigates` clicked at 2000ms and then
+advanced 2900ms to assert the original tick had not survived the click. Against
+a 3000ms delay that lands at 4900ms from mount — past the 3000ms slot, so the
+negative assertion bites. Against 5000 it lands at 4900ms, **before** the slot
+it claims to have outlived, and the test goes green having measured nothing.
+
+It was not wrong when written. A timing change is precisely the moment a test
+whose assertion is spelled in literals stops working, and nothing announces it —
+the suite stays green, which is the whole problem. Respelled as `DELAY_MS - 1`
+arithmetic, which cannot rot at any delay, and the two timings now have one home
+at the top of the `motion` describe rather than nine spellings of `3000`.
+
+**The suite is proven by mutation, not by its own green.** Restoring
+`SLIDE_MS = 500` / `DELAY_MS = 3000` in the component turns **5 of the 25 tests
+red**. They measure this cadence rather than passing regardless of it.
+
+### What has no evidence behind it, stated plainly
+
+`matching/gate.sh` **cannot run**, at any tag, on any page:
+`checkRef()` → `GET https://www.29navy.com/ → HTTP 301, expected 200`, because
+that host now serves this build (#43). So there is no geometry, pixel or
+interaction-state measurement behind this change and there cannot be one. The
+honest status is **unverified-against-reference**, not verified — and every
+later change to this site inherits that condition. The close-out in
+`matching/LEDGER.md` ends the programme; it does not end the site changing, so
+the deviation is recorded there too rather than only here.
+
+`pnpm verify` is the gate that does still apply, and it is green
+(`VERIFY_EXIT=0`; 62 test files, 554 unit tests, 10 browser tests).
+
+### Confirmed on a production build, not on the dev server
+
+`pnpm build && pnpm preview`, per the repo's own rule, because the shipped
+bundle is where both scroll-driven runway stages once rendered frame 0 while dev
+looked fine:
+
+- Applied motion, read off a `.w-slide` after a real arrow click:
+  `transition-property: transform`, `transition-duration: **1.6s**`,
+  `transition-timing-function: **ease**`.
+- A wrinkle worth knowing, since it looks like the change half-landed: the raw
+  `style` attribute reads back as `transition: transform 1600ms` with **no
+  easing at all**. Chrome drops `ease` when reserializing the shorthand because
+  it is CSS's default timing function. The computed value is `ease`; a grep of
+  the attribute would say otherwise.
+- Autoplay cadence, timed from page state rather than from the source constant:
+  ticks at **4601 / 9602 / 14601ms**, gaps of **5001** and **4999ms**. A flat
+  5000ms grid. (The first is short only because observation started after
+  hydration.)
+
+A first attempt at that cadence measurement read 2177ms and was wrong — it began
+mid-cycle, after an arrow click earlier in the same page had already restarted
+the delay. Timing the GAP between consecutive ticks rather than the wait for the
+first one is what makes the number independent of when you started watching.

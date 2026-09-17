@@ -579,3 +579,83 @@ It does not assert the build matches the reference in the states Phase 5 would
 have measured, or that Phase 6's adversarial review would have found nothing.
 Those were not run. 16/20 is the score for what was measured, and the four
 regions that were never going to pass are named above.
+
+## Post-close — the hero slideshow's timing becomes the Reddoor site's (2026-09-17)
+
+**The first change made after the reference died, and the first that cannot be
+gate-checked at all.** Recorded here because the close-out entry above stops the
+programme; it does not stop the site changing, and a deviation decided after the
+ledger closes is exactly the one a later reader will not otherwise find.
+
+### [deviation] Slide duration 500 → 1600ms, autoplay delay 3000 → 5000ms
+
+**Client request, not a measurement.** Tim Holmes in `#worthe-web-maintenance`,
+2026-09-17 20:00: _"On the homepage slideshow it'd be nice if the photos did a
+nice slow ease-in at the end."_ Relayed with the instruction that the ease match
+the Reddoor site.
+
+The reference's slider element declares `data-duration="500"`,
+`data-delay="3000"`, `data-easing="ease"` (`matching/spec/index.html`). Two of
+those three no longer hold.
+
+**The curve did NOT change, and this is the part worth keeping.** Reddoor's
+slideshow eases with `cubic-bezier(0.25, 0.1, 0.25, 1)`
+(reddoor-website `src/lib/components/Slideshow/Slideshow.svelte:178`), and that
+is the CSS keyword **`ease`** — the spec defines `ease` as exactly that curve.
+It is the keyword the Webflow reference already specified and the one this slice
+already used. So "match the Reddoor ease" turned out to be a pure DURATION
+change: identical curve, 3.2× the time to play out. At 500ms the deceleration
+tail is over before the eye resolves it; at 1600ms it is the whole impression.
+
+Had this been taken as a curve problem, the fix would have been to invent an
+easing nobody asked for and leave the duration — which would not have looked
+like the Reddoor site at all.
+
+**Measured rather than asserted from the spec**, because Chrome's computed style
+preserves whichever spelling you wrote (`ease` reads back as `ease`), so string
+comparison cannot settle it. Two elements animated over the same 1600ms and
+sampled at identical clock positions, `translateX(0 → 1000px)`, with `ease-out`
+as a control that must and does differ:
+
+| t (ms) |  `ease` | `cubic-bezier(.25,.1,.25,1)` | `ease-out` (control) |
+| -----: | ------: | ---------------------------: | -------------------: |
+|    100 |  45.575 |                       45.575 |              102.133 |
+|    400 | 408.511 |                      408.511 |              378.138 |
+|    800 | 802.403 |                      802.403 |              684.643 |
+|   1200 | 960.459 |                      960.459 |              906.535 |
+|   1500 | 997.834 |                      997.834 |              993.098 |
+
+Identical at every sample; the control differs at every one, so the instrument
+is measuring something. The same table is the clearest statement of WHY the
+duration was the lever: `ease` covers **80% of the distance in the first half**
+and then crawls 802 → 960 → 998 across the remaining 800ms. That crawl is what
+Tim is asking for. At the reference's 500ms it lasts 250ms; at 1600ms it lasts
+800ms and becomes the whole impression of the move.
+
+**Both numbers move together, from one component.** `transitionMs = 1600`
+(Slideshow.svelte:13) and `interval = 5000` (Slideshow.svelte:12). Holding the
+reference's 3000ms delay while taking Reddoor's 1600ms slide would leave 1400ms
+of stillness — the strip in motion 53% of the time, against the reference's 17%
+and Reddoor's 32%. That is a cadence neither site has and nobody chose.
+
+### What this deviation is NOT backed by
+
+`bash matching/gate.sh` **cannot run**, at any tag, for any page. `29navy.com`
+now serves this build, so `checkRef()` refuses:
+`GET https://www.29navy.com/ → HTTP 301, expected 200`. There is no measurement
+behind this change and there cannot be one — the honest status is
+**unverified-against-reference**, not verified.
+
+What it IS backed by: 25 unit tests in `NavyHeroSlider.test.ts`, proven by
+mutation rather than by their own green. Restoring `SLIDE_MS = 500` /
+`DELAY_MS = 3000` in the component turns **5 of them red**, so they measure this
+cadence rather than passing regardless of it.
+
+One defect found in the act of changing them, worth naming because it passed for
+years: `restarts the full delay when the visitor navigates` clicked at 2000ms
+and then waited 2900ms to assert the original tick had not survived. Against a
+5000ms delay that check lands at 4900ms from mount — **before** the slot it
+claims to have outlived — so it would have gone green while measuring nothing.
+Respelled as `DELAY_MS - 1` arithmetic, which cannot rot at any delay. The old
+spelling was correct at 3000 and silently vacuous at 5000; a timing change is
+precisely when that class of test stops working and nothing says so.
