@@ -670,34 +670,96 @@ Respelled as `DELAY_MS - 1` arithmetic, which cannot rot at any delay. The old
 spelling was correct at 3000 and silently vacuous at 5000; a timing change is
 precisely when that class of test stops working and nothing says so.
 
-## Post-close — the hero's first slide is preloaded (2026-09-21, #48)
+## Post-close — the hero's first burst becomes its first slide (2026-09-21, #48, #52)
 
-Not a deviation: no selector, rule, box or pixel of the slice changes. One
-`<link rel="preload" as="image" fetchpriority="high">` is added to the document
-`<head>`, outside the subtree the geometry gate diffs. Recorded here because a
-shared component was read and deliberately not used.
+Performance work, on a page that can no longer be gated: `29navy.com` serves
+this build, so `checkRef()` refuses and `bash matching/gate.sh` cannot run at
+any tag. What stands in for the gate is stated per item below. Nothing here
+changes a settled frame; two things change WHEN a frame becomes what it was
+always going to be.
+
+### [deviation] `.image-18 { height: auto }` at ≤767px — not in the reference
+
+The reference's aerial `<img>` carries no `width`/`height`, so it needs no
+`height: auto`, and neither did ours. Ours now carries both, from the authored
+Prismic dimensions, because the aerial landing in an unreserved box IS the
+layout shift on `div#Lofts`: **0.115–0.142** in every production run where the
+image loaded, **0.009** in every run where it was blocked (2026-09-21, 31 runs).
+
+Those attributes are presentational hints for both axes. `img { max-width:
+100% }` (ref css:235) caps the width; without `height: auto` the height would
+stay at the full authored pixel height. With it, used height = used width ÷
+aspect ratio — what the bare `<img>` resolved to once loaded.
+
+`height: auto` itself moves nothing. Standing in for the gate, `.image-18` and
+`#Lofts` measured after full load, production against this build's production
+bundle:
+
+| Viewport | Aerial, production | Aerial, this build | `#Lofts` top    |
+| -------- | ------------------ | ------------------ | --------------- |
+| 390      | 389.97 × 209.86    | 390 × 209.63       | 691.86 → 691.63 |
+| 767      | 766.98 × 412.73    | 767 × 412.45       | 984.73 → 984.45 |
+
+The aerial is **0.23px / 0.28px shorter** and everything below it rises by the
+same amount. That is the srcset below, not this rule: see the next item.
+
+### [deviation] slides 2–6 say `background-image: none` until load + idle
+
+At first paint only slide 0 carries its photograph. The other five carry an
+explicit `none`, replaced by their authored URL once `load` has fired and the
+main thread is idle, or the moment a visitor navigates. They are off-screen in
+every frame the gate ever photographed at rest, so no settled frame differs.
+
+The `none` is load-bearing: each slide class has a default photograph in the
+stylesheet (ref css:2231-2251, the captured JPEGs), and an omitted declaration
+falls through to it — five unoptimised local JPEGs at first paint, then the five
+authored ones after idle. jsdom cannot see that; the smoke spec watches the real
+network and fails on it.
+
+Autoplay skips any tick that lands before they are painted, so a slow
+connection never slides onto the slider's bare grey background.
+
+### The aerial gains a `srcset` ladder — not a deviation in any rendered box
+
+`480w, 768w, 1024w, 1440w` via imgix, `sizes="100vw"`. The image is displayed at
+≤767px only and its wrapper is full-bleed there, so `100vw` is its used width.
+201KB unsized, ~25KB at 768w.
+
+It is NOT pixel-neutral, and the first draft of this entry said it was. imgix
+rounds each rendition's height to a whole pixel — 480w is 480×258 (1.8605) and
+768w is 768×413 (1.8596), against the master's 1600×861 (1.8583) — and once the
+image has loaded the browser uses the loaded resource's ratio, not the
+attributes'. Hence the 0.23px and 0.28px in the table above. No width in the
+ladder avoids it: 1600 and 861 share no factor, so only the master itself
+divides evenly. Accepted as sub-pixel, on an element with no gate left to
+answer to; recorded so that nobody later measures it and goes looking for a
+regression. The captured `/29navy/assets` fallback is not a Prismic URL, gets no
+srcset and no attributes, and renders exactly as before.
+
+**Deliberately NOT done: `NavyContact`'s photograph.** It is 304KB and its only
+srcset candidate is the unsized 4240px master, which looks like the obvious next
+win. That single candidate is the panel's geometry (see the note in the slice:
+`sizes="100vw"` over a w-descriptor is what lands the panel on 373.34px), and the
+blocking experiment shows it does not govern the score: contact blocked alone
+read 74, 73, 85; slides and aerial blocked with contact still loading read
+97, 96, 98.
 
 ### Checked and rejected, so the next session does not re-derive it
 
-`components/HeroBackgroundImage.svelte` is the starter's answer to exactly this
-problem — "LCP-optimized hero image", a preload in `<svelte:head>` — and
-`docs/COMPONENTS.md` surfaced it before anything was written. Reuse is blocked
-twice over:
+`components/HeroBackgroundImage.svelte` is the starter's answer to an LCP hero
+— a preload in `<svelte:head>` — and `docs/COMPONENTS.md` surfaced it before
+anything was written. Reuse is blocked twice over:
 
 - **The markup.** It renders an `<img>`. These slides are the reference's
-  `div.w-slide` elements painting CSS backgrounds (ref css:2231-2251), and the
-  gate diffs that subtree against the transcribed Webflow DOM.
+  `div.w-slide` elements painting CSS backgrounds, and the gate diffed that
+  subtree against the transcribed Webflow DOM.
 - **The preload itself, which is the part worth writing down.** It preloads with
-  `imagesrcset` + `imagesizes`, which is correct for the `<img srcset>` it
-  renders and wrong for a CSS background: a background cannot consume a srcset,
-  so whichever candidate the browser chose would never be the URL the stylesheet
-  asks for, and the photograph would download twice — once at highest priority.
-  Lifting the logic verbatim would have made #48 worse while looking like the
-  house pattern.
+  `imagesrcset` + `imagesizes`, correct for the `<img srcset>` it renders and
+  wrong for a CSS background: a background cannot consume a srcset, so whichever
+  candidate the browser chose would never be the URL the stylesheet asks for,
+  and the photograph would download twice — once at highest priority.
 
-What was lifted: the idea (`<svelte:head>`, `fetchpriority="high"`), and the
-component's one-preload-per-page rule. What replaced the srcset: a bare `href`
-read from `slides[0].url`, the same value `slideStyle` writes into `url("…")`.
-`NavyHeroSlider.test.ts` holds that identity, and five mutations — a differing
-query param, an added `imagesrcset`, a preload per slide, an unconditional
-fallback, a dropped `fetchpriority` — each turn exactly one of its tests red.
+What was lifted: the idea (`<svelte:head>`, `fetchpriority="high"`), its
+one-preload-per-page rule, and — from `utils/preloadHidden.ts` — the
+load-then-idle schedule, moved into `utils/afterLoadIdle.ts` so the slider and
+the modal warm-up share one implementation instead of two.

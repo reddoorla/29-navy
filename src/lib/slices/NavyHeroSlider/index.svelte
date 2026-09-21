@@ -1,5 +1,7 @@
 <script lang="ts">
   import { prefersReducedMotion } from "$lib/transitions";
+  import { afterLoadIdle } from "$lib/utils/afterLoadIdle";
+  import { srcset as imgixSrcset } from "$lib/utils/image";
   import type { ImageField } from "@prismicio/client";
 
   // Mirrors model.json. Slice Machine's generated `Content.NavyHeroSliderSlice`
@@ -72,6 +74,23 @@
   const logoAlt = $derived(slice.primary.logo?.alt ?? REF_LOGO_ALT);
   const aerialUrl = $derived(slice.primary.mobile_location_image?.url ?? REF_AERIAL);
   const aerialAlt = $derived(slice.primary.mobile_location_image?.alt ?? REF_AERIAL_ALT);
+
+  /* The aerial is displayed at ≤767px only and is full-bleed there, so
+   * `sizes="100vw"` is exact and 1440w covers a 480px phone at 3x. Unsized it is
+   * the 201KB desktop master on every phone; the 768w rendition of the same
+   * photograph is ~25KB. `imgixSrcset` returns undefined for anything that is
+   * not a Prismic URL, so the captured /29navy/assets fallback keeps its bare
+   * `src`, exactly as before. */
+  const AERIAL_WIDTHS = [480, 768, 1024, 1440];
+  const aerialSrcset = $derived(
+    imgixSrcset(slice.primary.mobile_location_image?.url, AERIAL_WIDTHS),
+  );
+  /* Authored dimensions, so the browser can reserve the box before the bytes
+   * arrive. This image landing in an unreserved box IS the 0.12–0.14 layout
+   * shift measured on div#Lofts (#48) — present in every run where the aerial
+   * loaded, absent in every run where it was blocked. Only safe alongside the
+   * `height: auto` in the ≤767px block below; see the note there. */
+  const aerialDims = $derived(slice.primary.mobile_location_image?.dimensions);
 
   /* ---- Motion -------------------------------------------------------------
    *
@@ -202,9 +221,36 @@
    *  the delay — routing the interval through it would re-key the effect on
    *  every tick and rebuild the interval 20 times a minute for no reason. */
   function stepByUser(delta: number) {
+    // A visitor who navigates before the page has gone idle gets the
+    // photographs now: they asked to see one.
+    restPainted = true;
     step(delta);
     autoplayEpoch++;
   }
+
+  /* SLIDES 2–6 ARE NOT PAINTED UNTIL THE PAGE HAS LOADED AND GONE IDLE.
+   *
+   * They are off-screen at first paint, and they are 414KB of high-priority
+   * CSS backgrounds requested in the same burst as the 65KB first slide — the
+   * page's LCP element. Measured on production 2026-09-21 by blocking requests
+   * (#48): with these five and the aerial out of that burst, Lighthouse
+   * performance read 97, 96, 98. With them in it, anything from 73 to 94, run to
+   * run, on every deploy back past the motion change first suspected.
+   *
+   * So the server renders slide 0's photograph and nobody else's, and this flag
+   * releases the rest. `afterLoadIdle` is the schedule `preloadHidden` already
+   * used for the same reason, lifted out so the two cannot drift.
+   *
+   * Without JavaScript the flag never flips — and nothing is lost, because
+   * without JavaScript the strip never moves: arrows, dots and autoplay are all
+   * script. Slide 0 is the only one a no-JS visitor can ever see.
+   *
+   * No CMS content is the one case this does not reach: those six slides take
+   * their photographs from the class rules in the stylesheet below, which the
+   * browser fetches eagerly whatever this flag says. That is a fresh clone's
+   * dev state, not a deployed one. */
+  let restPainted = $state(false);
+  $effect(() => afterLoadIdle(() => (restPainted = true)));
 
   // Autoplay. `data-autoplay-limit="0"` is unlimited, and clicking a dot on the
   // reference does NOT stop it — measured: after jumping to slide 6 by hand, the
@@ -225,7 +271,12 @@
     // `step` reads `index`/`offsets` inside the callback, which runs after this
     // effect has finished collecting dependencies — so the interval is created
     // once per slide count, not once per slide change.
-    const id = setInterval(() => step(1), DELAY_MS);
+    // A tick that lands before the rest are painted is skipped, not queued: on
+    // a connection slow enough for `load` to take longer than DELAY_MS, sliding
+    // would reveal the slider's bare grey background.
+    const id = setInterval(() => {
+      if (restPainted) step(1);
+    }, DELAY_MS);
     return () => clearInterval(id);
   });
 
@@ -240,7 +291,17 @@
       teleported.includes(i) || prefersReducedMotion()
         ? "transition: none"
         : `transition: transform ${SLIDE_MS}ms ${EASE}`;
-    const background = url ? `background-image: url("${url}"); ` : "";
+    // Three states, not two. An authored slide being held back must SAY `none`:
+    // every slide class has a default photograph in the stylesheet below (the
+    // captured reference JPEG), so merely omitting the declaration would fall
+    // through to it — five unoptimised local JPEGs fetched at first paint, then
+    // the five authored photographs after idle. With nothing authored the
+    // declaration is omitted on purpose, because those defaults are the slides.
+    const background = !url
+      ? ""
+      : i === 0 || restPainted
+        ? `background-image: url("${url}"); `
+        : "background-image: none; ";
     // MINUS i, and that subtraction is the whole slider.
     //
     // `.w-slide` is `display: inline-block` (measured on the reference), so
@@ -293,12 +354,17 @@
 </script>
 
 <!-- THE FIRST SLIDE IS THE PAGE'S LCP ELEMENT, AND A CSS BACKGROUND IS INVISIBLE
-     TO THE PRELOAD SCANNER. Measured on production 2026-09-21 (#48): the browser
-     discovered this photograph 1.1–2.4s after the document arrived, and once
-     ~1MB of other images were competing with it at the same priority LCP landed
-     at 5.3–5.7s instead of 2.3–2.7s. Lighthouse performance flipped between ~90
-     and ~72 from one run to the next, on every deploy including those before
-     the motion change that was first suspected.
+     TO THE PRELOAD SCANNER. The preload starts its fetch with the document:
+     measured on the Netlify deploy preview, the <link> requested it at 646ms
+     against 1288ms for the earliest stylesheet-initiated image.
+
+     THIS IS THE SMALLER HALF OF #48, and it says so because the issue first said
+     otherwise. It was proposed as the whole fix on a reading of Lighthouse's LCP
+     phase breakdown ("discovered 1.1–2.4s late") that was scaled simulator
+     output, not a measurement — the observed request starts at ~240ms either
+     way. Alone, it moved five runs from 79,79,79,87,88 to 86,93,74,85,79. What
+     governs the score is what loads ALONGSIDE this photograph; see `restPainted`
+     above and the aerial's srcset.
 
      `href` is `slides[0].url` — THE SAME VALUE `slideStyle` writes into
      `url("…")`, read from the same place, never rebuilt. A preload matches a CSS
@@ -449,7 +515,16 @@
        actively wrong: nothing in the reference stylesheet sets `img { height:
        auto }`, so a height attribute would hold this image at 861px while
        max-width:100% (ref css:234) shrank its width, distorting it. -->
-  <img src={aerialUrl} loading="lazy" alt={aerialAlt} class="image-18" />
+  <img
+    src={aerialUrl}
+    srcset={aerialSrcset}
+    sizes={aerialSrcset ? "100vw" : undefined}
+    width={aerialDims?.width}
+    height={aerialDims?.height}
+    loading="lazy"
+    alt={aerialAlt}
+    class="image-18"
+  />
 </div>
 
 <style>
@@ -846,6 +921,20 @@
     .mobile-location,
     .image-18 {
       display: block;
+    }
+
+    /* NOT IN THE REFERENCE — matching/LEDGER.md has the entry. The reference's
+       <img> carries no width/height, so it needs no `height: auto`; ours now
+       carries both, to reserve the box and stop the layout shift on div#Lofts.
+       Those attributes are presentational hints for BOTH axes: `img { max-width:
+       100% }` (ref css:235) caps the width, and without this rule the height
+       would stay at the full authored pixel height — a 2400×1350 photograph
+       rendered 390×1350. With it the used height is width ÷ aspect ratio, which
+       is exactly what the bare <img> resolved to once it had loaded. This rule
+       moves nothing in the final box. (The srcset does, by under 0.3px: imgix
+       rounds each rendition's height to a whole pixel. LEDGER has the table.) */
+    .image-18 {
+      height: auto;
     }
 
     /* ref css:3365-3367 — 140+20 = 160 > 80, so this arrow swells to 160px too. */

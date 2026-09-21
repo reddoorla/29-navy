@@ -88,9 +88,14 @@ describe("NavyHeroSlider slice", () => {
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("puts the six slides in reference class order, so frame 0 is gallery_roof1", () => {
+  it("puts the six slides in reference class order, so frame 0 is gallery_roof1", async () => {
+    vi.useFakeTimers();
     const { container } = mount();
     const slides = [...container.querySelectorAll(".w-slider-mask > div")];
+    // Slides 2–6 are painted after load + idle (#48), so the fourth slide's
+    // photograph is only there to be read once that has happened. 3100ms clears
+    // the helper's idle fallback and stays well short of the first autoplay tick.
+    await vi.advanceTimersByTimeAsync(3100);
     expect(slides.map((el) => el.className.replace(/\s*svelte-\S+/, ""))).toEqual([
       "slide-6 w-slide",
       "slide-7 w-slide",
@@ -147,13 +152,6 @@ describe("NavyHeroSlider slice", () => {
     expect(logo.getAttribute("width")).toBe("143");
     expect(logo.hasAttribute("height")).toBe(false);
     expect(logo.getAttribute("src")).toContain("29-navy-logo-black.jpg");
-  });
-
-  it("gives the aerial no width/height attributes, since no CSS sets height:auto", () => {
-    const { container } = mount();
-    const aerial = container.querySelector("#Mobile-location img.image-18") as HTMLImageElement;
-    expect(aerial.hasAttribute("width")).toBe(false);
-    expect(aerial.hasAttribute("height")).toBe(false);
   });
 
   it("server-renders six nav dots with the first one active", () => {
@@ -630,5 +628,179 @@ describe("NavyHeroSlider LCP preload", () => {
     } as never;
     render(NavyHeroSlider, { props: { slice: bare } });
     expect(preloads()).toHaveLength(0);
+  });
+});
+
+// WHAT ACTUALLY MOVES THE LIGHTHOUSE SCORE (#48, corrected). Not late discovery
+// of the hero — that reading came from Lantern's scaled phase numbers and was
+// wrong. Measured by blocking requests on production, 2026-09-21: the score is
+// governed by the bytes that load ALONGSIDE the first slide. With slides 2–6
+// (414KB) and the aerial (201KB) out of the first burst it read 97, 96, 98;
+// with them in, anything from 73 to 94. The aerial is also the layout shift:
+// 0.12–0.14 on div#Lofts in every run where it loads, 0.009 where it does not.
+describe("NavyHeroSlider keeps the first burst to the first slide", () => {
+  const DELAY_MS = 5000;
+  // jsdom has no requestIdleCallback, so the after-load-and-idle schedule falls
+  // back to a timer. Anything comfortably under DELAY_MS and over that fallback.
+  const PAST_IDLE = 3100;
+
+  const backgrounds = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLElement>(".w-slider-mask .w-slide")].map(
+      (el) => /background-image:\s*url\("([^"]+)"\)/.exec(el.getAttribute("style") ?? "")?.[1],
+    );
+  const authoredUrls = SLIDE_FILES.map((f) => A + f);
+  const activeDot = (container: HTMLElement) =>
+    [...container.querySelectorAll(".w-slider-dot")].findIndex((d) =>
+      d.classList.contains("w-active"),
+    );
+
+  const setReadyState = (value: DocumentReadyState) =>
+    Object.defineProperty(document, "readyState", { value, configurable: true });
+  afterEach(() => {
+    // Drop the instance override so the prototype getter ("complete") is back.
+    delete (document as { readyState?: unknown }).readyState;
+  });
+
+  it("first paints the first slide's photograph and no other", () => {
+    vi.useFakeTimers();
+    const { container } = mount();
+    expect(backgrounds(container)).toEqual([authoredUrls[0], ...Array(5).fill(undefined)]);
+  });
+
+  it("says `background-image: none` on the slides it is holding back", () => {
+    // Omitting the declaration is NOT withholding the photograph. Every slide
+    // class carries a default in the stylesheet — the captured reference JPEG
+    // (`.slide-7 { background-image: url("/29navy/assets/…colvu2.jpg") }`) — so a
+    // slide with no inline background falls through to it, and the browser
+    // fetches five unoptimised local JPEGs at first paint and then the five
+    // authored photographs after idle: ten requests where there were five.
+    // jsdom fetches nothing, so only this assertion can see it from here;
+    // tests/smoke/hero-lcp-preload.spec.ts watches the real network.
+    vi.useFakeTimers();
+    const { container } = mount();
+    const styles = [...container.querySelectorAll(".w-slider-mask .w-slide")].map(
+      (el) => el.getAttribute("style") ?? "",
+    );
+    expect(styles[0]).not.toContain("background-image: none");
+    for (const style of styles.slice(1)) expect(style).toContain("background-image: none;");
+  });
+
+  it("leaves the stylesheet defaults alone when nothing is authored", () => {
+    // No CMS: the class defaults ARE the photographs. `none` here would blank
+    // the whole strip on a fresh clone.
+    vi.useFakeTimers();
+    const bare = {
+      slice_type: "navy_hero_slider",
+      variation: "default",
+      primary: { logo: {}, tagline_line_1: null, tagline_line_2: null, slides: [] },
+    } as never;
+    const { container } = render(NavyHeroSlider, { props: { slice: bare } });
+    for (const el of container.querySelectorAll(".w-slider-mask .w-slide")) {
+      expect(el.getAttribute("style") ?? "").not.toContain("background-image");
+    }
+  });
+
+  it("paints the other five once the page has loaded and gone idle", async () => {
+    vi.useFakeTimers();
+    const { container } = mount();
+    await vi.advanceTimersByTimeAsync(PAST_IDLE);
+    expect(backgrounds(container)).toEqual(authoredUrls);
+  });
+
+  it("paints them at once when the visitor navigates before that", async () => {
+    vi.useFakeTimers();
+    setReadyState("loading"); // nothing but the click can have painted them
+    const { container } = mount();
+    (container.querySelector(".w-slider-arrow-right") as HTMLElement).click();
+    await tick();
+    expect(backgrounds(container)).toEqual(authoredUrls);
+  });
+
+  it("holds autoplay rather than sliding onto a photograph it has not painted", async () => {
+    vi.useFakeTimers();
+    setReadyState("loading");
+    const { container } = mount();
+    await vi.advanceTimersByTimeAsync(DELAY_MS + 100);
+    expect(activeDot(container), "still on the first slide").toBe(0);
+    expect(backgrounds(container).slice(1)).toEqual(Array(5).fill(undefined));
+
+    setReadyState("complete");
+    window.dispatchEvent(new Event("load"));
+    await vi.advanceTimersByTimeAsync(PAST_IDLE);
+    expect(backgrounds(container)).toEqual(authoredUrls);
+    await vi.advanceTimersByTimeAsync(DELAY_MS);
+    expect(activeDot(container), "autoplay resumes once they are painted").toBe(1);
+  });
+});
+
+describe("NavyHeroSlider mobile aerial", () => {
+  const PRISMIC_AERIAL =
+    "https://images.prismic.io/29-navy/location-aerial.jpg?auto=format,compress";
+  const withAerial = {
+    slice_type: "navy_hero_slider",
+    variation: "default",
+    primary: {
+      logo: {},
+      tagline_line_1: null,
+      tagline_line_2: null,
+      slides: [],
+      mobile_location_image: {
+        url: PRISMIC_AERIAL,
+        alt: "Aerial view",
+        dimensions: { width: 2400, height: 1350 },
+      },
+    },
+  } as never;
+  const aerialOf = (container: HTMLElement) =>
+    container.querySelector("#Mobile-location img.image-18") as HTMLImageElement;
+
+  it("reserves the aerial's box before it loads, from the authored dimensions", () => {
+    // The 0.12–0.14 layout shift on div#Lofts IS this image arriving into a box
+    // nobody reserved. width/height give the browser the aspect ratio up front…
+    const aerial = aerialOf(render(NavyHeroSlider, { props: { slice: withAerial } }).container);
+    expect(aerial.getAttribute("width")).toBe("2400");
+    expect(aerial.getAttribute("height")).toBe("1350");
+  });
+
+  it("pairs those attributes with height:auto, without which they would distort it", () => {
+    // …and they are only safe WITH `height: auto`. The attributes map to
+    // presentational width/height hints; `img { max-width: 100% }` (ref css:235)
+    // caps the width and would leave the height at its full 1350px. That is the
+    // reason the attributes were left off before — the rule has to ship with them.
+    const source = readFileSync(join(HERE, "index.svelte"), "utf8");
+    const block =
+      /@media screen and \(max-width: 767px\) \{([\s\S]*?)\n {2}\}\n/.exec(source)?.[1] ?? "";
+    expect(block).toMatch(/\.image-18\s*\{[^}]*height:\s*auto;/);
+  });
+
+  it("offers a width ladder so a phone does not download the desktop master", () => {
+    // 201KB unsized; the 768w rendition of the same photograph is ~25KB.
+    // sizes="100vw" is exact here: the wrapper is full-bleed at every viewport
+    // where the image is displayed (≤767px).
+    const aerial = aerialOf(render(NavyHeroSlider, { props: { slice: withAerial } }).container);
+    const candidates = (aerial.getAttribute("srcset") ?? "").split(", ");
+    expect(candidates.map((c) => c.split(" ")[1])).toEqual(["480w", "768w", "1024w", "1440w"]);
+    for (const c of candidates) {
+      const [url, w] = c.split(" ") as [string, string];
+      expect(new URL(url).searchParams.get("w")).toBe(w.replace("w", ""));
+      expect(new URL(url).pathname).toBe(new URL(PRISMIC_AERIAL).pathname);
+    }
+    expect(aerial.getAttribute("sizes")).toBe("100vw");
+    expect(aerial.getAttribute("loading")).toBe("lazy");
+  });
+
+  it("leaves the captured reference aerial exactly as it was when nothing is authored", () => {
+    // No CMS: a local /29navy/assets file, which imgix cannot resize and whose
+    // dimensions nobody has authored. No srcset, no attributes — and therefore
+    // no distortion, because there is nothing for height:auto to correct.
+    const bare = {
+      slice_type: "navy_hero_slider",
+      variation: "default",
+      primary: { logo: {}, tagline_line_1: null, tagline_line_2: null, slides: [] },
+    } as never;
+    const aerial = aerialOf(render(NavyHeroSlider, { props: { slice: bare } }).container);
+    expect(aerial.hasAttribute("srcset")).toBe(false);
+    expect(aerial.hasAttribute("width")).toBe(false);
+    expect(aerial.hasAttribute("height")).toBe(false);
   });
 });
