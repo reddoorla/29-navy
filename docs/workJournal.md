@@ -2565,6 +2565,8 @@ A `find` for result files across this checkout ran past a 120s timeout in
 
 ## 2026-09-21 (later) — The preload was the wrong fix, and the experiment that found the right one hid half of it (#52, `fix/hero-lcp-preload`)
 
+> Superseded in part by 2026-09-21 (evening) — The sweep cleared the site, and the configuration I measured in was never the one that scores it.
+
 The entry above ends "the fix is a preload of the first slide's image". That was
 built, deployed and measured, and it fixed nothing. This entry corrects three
 things in it, records what does govern the score, and records a second defect
@@ -2728,3 +2730,168 @@ deploys, the next `fleet-lighthouse` sweep overwrites the row's 72. The
 (reddoor-maintenance#890), so it has to be discarded and re-drafted, and the
 discard is a production delete that is Tucker's to run. Approval of the email
 stays with Tucker.
+
+## 2026-09-21 (evening) — The sweep cleared the site, and the configuration I measured in was never the one that scores it (#53, #54, #55, `docs/journal-sweep-cleared-and-the-wrong-configuration`)
+
+The entry above ends with the fix merged and a sweep owed. The sweep ran, the
+site is clean, and the email is still unsent. This entry corrects that entry on
+one point, records what a read-only trace of the report pipeline found, and
+records a measurement artifact that will otherwise be rediscovered from a score.
+
+### The sweep
+
+Dispatched by hand at 22:06 UTC, finished 22:26. Every audit passed:
+`netlify-deploy`, `domain`, `function-health`, `browser`, `lighthouse`, and the
+smoke run read `✔ 29-navy: all green (1m02s)`.
+
+| Column            | This morning | After the sweep |
+| ----------------- | ------------ | --------------- |
+| `p_score`         | 72           | **93**          |
+| `r_score`         | not written  | 100             |
+| `bp_score`        | 96           | 96              |
+| `seo_score`       | 100          | 100             |
+| `crossbrowser_ok` | 0            | 1               |
+
+The Firefox and WebKit desktop failure that the 2026-09-21 entry logged as
+unreproduced did not recur, so it is now clean rather than merely unexplained.
+`site_health` holds 40 of 47 columns; Airtable's shadow matches Turso field for
+field, including `pScore: 93` and `Crossbrowser OK: true`.
+
+### Belief corrected: the cockpit does not measure the way I measured
+
+The entry above explains the CI 72 with Lantern's arithmetic — the simulator
+charging the hero for every byte that finished before it painted. **The cockpit
+does not run Lantern.** `lighthouseAudit` dispatches to `deployedLighthouse`
+whenever a site has a deployed URL (`src/audits/lighthouse.ts:285-287`), and
+that path sets `preset: "desktop", throttlingMethod: "devtools"` over
+`numberOfRuns: 3`, averaged (`:224-236`, `:75-93`). Devtools throttling is
+applied, not simulated, and desktop is not mobile.
+
+Every A/B in that entry used the Lighthouse CLI's default, which is mobile
+emulation with simulated throttling. Two different instruments. The 72 and the
+93 are like-for-like with each other and with nothing I measured.
+
+### Reproducing the cockpit's configuration failed, and failed usefully
+
+Six rounds per arm, desktop preset, devtools throttling, machine idle, the
+pre-fix and post-fix deploy permalinks:
+
+| Arm              | Scores                 | LCP element             | Observed LCP |
+| ---------------- | ---------------------- | ----------------------- | ------------ |
+| before `caef74f` | 64, 68, 58, 68, 68, 55 | `div.slide-7` in 6 of 6 | 10.4–19.2 s  |
+| after `6bd4ca4`  | 65, 68, 68, 68, 68, 68 | `div.slide-7` in 6 of 6 | 10.4–11.1 s  |
+
+Neither arm is near 72 or 93, so this does not confirm or refute the sweep's
+improvement. What it does show is why. First contentful paint in those runs is
+0.39–2.1 s and load finishes at 0.41–1.3 s, so a 10.4 s LCP is not slowness: it
+is **two 5-second autoplay ticks** (`DELAY_MS = 5000`, NavyHeroSlider:163). The
+hero advances itself, and whenever a trace outlives two ticks the largest
+contentful paint is the SECOND slide, not the one the page leads with. It is
+identical in both arms, so it predates the fix and survives it. Filed as **#54**.
+
+The before arm's 58 and 55 look like a variance win for the fix and are not one:
+both track slow page loads on my own connection (`observedLoad` 3.3 s and
+11.3 s). Six runs on a domestic line cannot separate that from the site.
+
+So the only like-for-like evidence that the fix moved the cockpit is the fleet
+measuring itself twice, one 3-run average each side. That is thinner than the
+twelve-run table in the entry above, and it is what there is.
+
+### What a re-drafted email will actually contain
+
+Traced read-only through reddoor-maintenance, then re-verified by hand on the
+load-bearing claims, because a claim about what code does has to be made by
+reading that code.
+
+- **The number is not hand-copied.** The sweep writes `site_health.p_score`;
+  the draft reads it through the roster into `scoresFromWebsite`
+  (`src/reports/draft.ts:154-161`). Whatever the row holds at draft time is
+  what the client sees.
+- **Discard must come before re-draft.** `queueDraft`'s blocker test is
+  `reportTier(r.reportType) >= newTier` (`src/reports/queue.ts:70`), so a
+  pending Maintenance draft blocks a NEW Maintenance draft and the new row is
+  set `draft_ready = false`. Re-drafting first produces a draft nobody can
+  approve, silently, while the frozen 91 stays the only approvable report.
+- **The email's six checkmarks are unconditional.** `checklistRowsSection`
+  takes labels and renders `CHECK_PNG` for every one of them
+  (`src/reports/email-sections.ts:39-60`); no evidence field reaches the body.
+  "Google Indexed" therefore ships a green tick for a site with no Search
+  Console property configured. Five gating items genuinely do auto-tick now —
+  every health stamp is inside the 3-day window at
+  `src/reports/auto-tick.ts:13-18` — but the tick a client sees is not evidence
+  of that.
+- **The header plate is read from Turso at send time and written to Airtable at
+  draft time.** `headerPlateFor` returns the Turso blob when one exists
+  (`src/reports/send/orchestrate.ts:185-191`); `refreshHeaderImage` uploads with
+  `replaceIn: "Websites"` (`src/reports/draft.ts:52-56`). The comment at
+  `draft.ts:251-254` saying the send reads that attachment is false, so a
+  re-draft cannot change the image the client receives. Only
+  `header-image <site> --write-back` can.
+
+### The most useful thing that happened was checking a conclusion against a JPEG
+
+That last mechanism is real, and the conclusion drawn from it was not. It was
+reported to me that the plate is stale and now shows a hero the site no longer
+paints, which would have made a performance report lead with a picture of the
+problem. I pulled the blob out of Turso — 702,105 bytes, 2400×3200, generated
+2026-09-17T22:52Z — and looked at it. It is the rooftop-at-sunset slide. Then I
+loaded the live site at the generator's own 2500 ms settle
+(`src/reports/header-image/capture.ts:9`) and looked at that: the same slide.
+The plate is four days old and perfectly current. At 6000 ms the live page has
+advanced to the second slide, which is where the mistaken reading came from, and
+is the same fact as #54 seen from another angle.
+
+The pattern is worth naming, because it is the cheap half of a review being
+skipped: a correct mechanism was carried one step further into a consequence
+nobody looked at. Reading the code established the mechanism. Only opening the
+image disproved the consequence, and that cost one screenshot.
+
+### Honest accounting on the fix
+
+Of the three things #52 changed, only the slide deferral can plausibly move a
+DESKTOP audit. The mobile aerial is not rendered at desktop widths, and the
+Location band's photograph loads on desktop either way, since the band is
+visible there. So if the 21-point move is real, it is the 414 KB the first burst
+no longer carries. The aerial's reserved box and the band's custom property are
+mobile wins, measured as such, and they are not what the cockpit scored.
+
+### Found and not fixed
+
+- **#53** — the 64 KB navbar logo shown at 164 px, still named `fpo`, and the
+  304 KB Contact photograph. Neither moves the score.
+- **#54** — the autoplay/LCP interaction above.
+- **#55** — the hero caption "Creative Lofts for Lease" is light text with no
+  scrim over the rooftop slide's sky-to-building boundary. It matches the
+  reference (`matching/spec/index.html`, `.text-block` from ref css:2115-2124),
+  so a scrim would be a deviation and is the client's call, like #34.
+
+### A green CI and a red `pnpm verify`, on the same commit
+
+While this entry was being written, main took `#50`, a Renovate bump of
+`@reddoorla/maintenance` from 0.93.1 to 0.97.0. `pnpm verify` then failed here
+with:
+
+```
+✖ a11y: a11y: no results written (exit 1)
+```
+
+CI was green on that exact commit. `pnpm install --frozen-lockfile` reported
+"Already up to date", so it was not a stale tree. The new maintenance package
+carries a newer Playwright, which expects browser builds
+`chromium_headless_shell-1243`, `firefox-1543` and `webkit-2359`; this machine
+had 1234, 1538 and 2336. CI runs `playwright install` on every job and therefore
+never sees it. `playwright install chromium firefox webkit` fixed it, and verify
+then passed with 0 violations across 3 routes — one more route than this morning,
+because 0.97.0 also audits a route named in `package.json`.
+
+The failure message names neither Playwright nor a browser, and "no results
+written" reads like the site failing an audit rather than the audit never
+running. Filed against reddoor-maintenance. Locally: after any bump that touches
+the maintenance package, install the browsers before believing a red audit.
+
+### Still open
+
+The email. The frozen draft `rec67VEr1fwaZyNtv` is untouched, verified by a dry
+run that passes every guard and stops before both deletes, having backed up 33
+Turso columns and 16 Airtable fields. The discard is a production delete in two
+stores and is Tucker's to run, as is approval of the email.
