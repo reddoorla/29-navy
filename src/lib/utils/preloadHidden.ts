@@ -27,12 +27,13 @@
  * Setting srcset and sizes on the Image() makes it resolve the same candidate
  * the <img> will.
  */
+import { afterLoadIdle } from "./afterLoadIdle";
+
 export type PreloadTarget = string | { src?: string | null; srcset?: string; sizes?: string };
 
 export function preloadHidden(targets: readonly (PreloadTarget | null | undefined)[]): () => void {
   if (typeof window === "undefined") return () => {};
 
-  let idleHandle: number | undefined;
   let cancelled = false;
   const images: HTMLImageElement[] = [];
 
@@ -54,22 +55,13 @@ export function preloadHidden(targets: readonly (PreloadTarget | null | undefine
     }
   };
 
-  const schedule = () => {
-    if (cancelled) return;
-    idleHandle = window.requestIdleCallback
-      ? window.requestIdleCallback(warm, { timeout: 3000 })
-      : window.setTimeout(warm, 1000);
-  };
-
-  if (document.readyState === "complete") schedule();
-  else window.addEventListener("load", schedule, { once: true });
+  // The schedule — `load`, then idle — lives in afterLoadIdle, shared with the
+  // hero slider, which defers slides 2–6 for the same reason.
+  const cancelSchedule = afterLoadIdle(warm);
 
   return () => {
     cancelled = true;
-    window.removeEventListener("load", schedule);
-    if (idleHandle === undefined) return;
-    if (window.cancelIdleCallback) window.cancelIdleCallback(idleHandle);
-    else window.clearTimeout(idleHandle);
+    cancelSchedule();
     // Abandon in-flight fetches: a component torn down mid-warm should not keep
     // the connection. Setting src to "" is the documented way to do that.
     for (const img of images) {
