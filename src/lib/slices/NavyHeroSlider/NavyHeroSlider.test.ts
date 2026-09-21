@@ -549,3 +549,86 @@ describe("NavyHeroSlider slice", () => {
     });
   });
 });
+
+// The first slide is the page's LCP element and it paints as a CSS
+// background-image, which the preload scanner cannot see: measured on
+// production 2026-09-21, the browser found it 1.1–2.4s late and Lighthouse
+// performance flipped between ~90 and ~72 from run to run (#48). The cure is a
+// <link rel="preload"> — and its ONE hard requirement is that the href is the
+// IDENTICAL string the slide's `url("…")` carries. A preload that differs by a
+// single query param is worse than none: the image downloads twice, once at
+// highest priority. That is why there is no `imagesrcset` here, unlike
+// `HeroBackgroundImage.svelte`: a CSS background cannot consume a srcset, so
+// the candidate the browser picked would never be the URL the CSS asks for.
+describe("NavyHeroSlider LCP preload", () => {
+  const preloads = () =>
+    Array.from(document.head.querySelectorAll<HTMLLinkElement>("link[rel='preload'][as='image']"));
+
+  /** The URL inside the first slide's inline `background-image: url("…")`. */
+  const firstSlideUrl = (container: HTMLElement) => {
+    const style = container.querySelector(".w-slider-mask .w-slide")!.getAttribute("style") ?? "";
+    return /background-image:\s*url\("([^"]+)"\)/.exec(style)?.[1];
+  };
+
+  // svelte:head content is not removed by cleanup() (see
+  // HeroBackgroundImage.test.ts), so clear it or one test's link satisfies the next.
+  afterEach(() => preloads().forEach((el) => el.remove()));
+
+  // A Prismic-shaped URL with a second query param, so an implementation that
+  // rebuilds the URL instead of reusing it (re-encoding `&`, dropping `rect`,
+  // appending `w=`) cannot pass by accident.
+  const PRISMIC =
+    "https://images.prismic.io/29-navy/roof1.jpg?auto=format,compress&rect=0,0,1500,807";
+  const authored = {
+    slice_type: "navy_hero_slider",
+    variation: "default",
+    primary: {
+      logo: {},
+      tagline_line_1: null,
+      tagline_line_2: null,
+      slides: [
+        { image: { url: PRISMIC, alt: "Roof deck", dimensions: { width: 1500, height: 807 } } },
+        { image: image(SLIDE_FILES[1]!, "Second") },
+        { image: image(SLIDE_FILES[2]!, "Third") },
+      ],
+    },
+  } as never;
+
+  it("preloads the first slide's photograph from the exact URL its background paints", () => {
+    const { container } = render(NavyHeroSlider, { props: { slice: authored } });
+    const painted = firstSlideUrl(container);
+    expect(painted).toBe(PRISMIC);
+    const [link] = preloads();
+    expect(link, "a <link rel=preload as=image> in <head>").toBeDefined();
+    expect(link!.getAttribute("href")).toBe(painted);
+    expect(link!.getAttribute("fetchpriority")).toBe("high");
+  });
+
+  it("offers the browser no srcset, because a CSS background could never use the candidate", () => {
+    render(NavyHeroSlider, { props: { slice: authored } });
+    const [link] = preloads();
+    expect(link).toBeDefined();
+    expect(link!.hasAttribute("imagesrcset")).toBe(false);
+    expect(link!.hasAttribute("imagesizes")).toBe(false);
+  });
+
+  it("preloads exactly one image however many slides there are", () => {
+    // Every extra high-priority preload competes with the real LCP for
+    // bandwidth — the multi-instance hazard HeroBackgroundImage.svelte names.
+    mount();
+    expect(preloads()).toHaveLength(1);
+  });
+
+  it("emits no preload when the first slide has no authored image", () => {
+    // No CMS content: the slides paint the class defaults from the stylesheet,
+    // and there is no URL in hand that is guaranteed to match them. No preload
+    // beats a mismatched one.
+    const bare = {
+      slice_type: "navy_hero_slider",
+      variation: "default",
+      primary: { logo: {}, tagline_line_1: null, tagline_line_2: null, slides: [] },
+    } as never;
+    render(NavyHeroSlider, { props: { slice: bare } });
+    expect(preloads()).toHaveLength(0);
+  });
+});

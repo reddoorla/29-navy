@@ -669,3 +669,35 @@ claims to have outlived — so it would have gone green while measuring nothing.
 Respelled as `DELAY_MS - 1` arithmetic, which cannot rot at any delay. The old
 spelling was correct at 3000 and silently vacuous at 5000; a timing change is
 precisely when that class of test stops working and nothing says so.
+
+## Post-close — the hero's first slide is preloaded (2026-09-21, #48)
+
+Not a deviation: no selector, rule, box or pixel of the slice changes. One
+`<link rel="preload" as="image" fetchpriority="high">` is added to the document
+`<head>`, outside the subtree the geometry gate diffs. Recorded here because a
+shared component was read and deliberately not used.
+
+### Checked and rejected, so the next session does not re-derive it
+
+`components/HeroBackgroundImage.svelte` is the starter's answer to exactly this
+problem — "LCP-optimized hero image", a preload in `<svelte:head>` — and
+`docs/COMPONENTS.md` surfaced it before anything was written. Reuse is blocked
+twice over:
+
+- **The markup.** It renders an `<img>`. These slides are the reference's
+  `div.w-slide` elements painting CSS backgrounds (ref css:2231-2251), and the
+  gate diffs that subtree against the transcribed Webflow DOM.
+- **The preload itself, which is the part worth writing down.** It preloads with
+  `imagesrcset` + `imagesizes`, which is correct for the `<img srcset>` it
+  renders and wrong for a CSS background: a background cannot consume a srcset,
+  so whichever candidate the browser chose would never be the URL the stylesheet
+  asks for, and the photograph would download twice — once at highest priority.
+  Lifting the logic verbatim would have made #48 worse while looking like the
+  house pattern.
+
+What was lifted: the idea (`<svelte:head>`, `fetchpriority="high"`), and the
+component's one-preload-per-page rule. What replaced the srcset: a bare `href`
+read from `slides[0].url`, the same value `slideStyle` writes into `url("…")`.
+`NavyHeroSlider.test.ts` holds that identity, and five mutations — a differing
+query param, an added `imagesrcset`, a preload per slide, an unconditional
+fallback, a dropped `fetchpriority` — each turn exactly one of its tests red.

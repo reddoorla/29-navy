@@ -292,6 +292,37 @@
   };
 </script>
 
+<!-- THE FIRST SLIDE IS THE PAGE'S LCP ELEMENT, AND A CSS BACKGROUND IS INVISIBLE
+     TO THE PRELOAD SCANNER. Measured on production 2026-09-21 (#48): the browser
+     discovered this photograph 1.1–2.4s after the document arrived, and once
+     ~1MB of other images were competing with it at the same priority LCP landed
+     at 5.3–5.7s instead of 2.3–2.7s. Lighthouse performance flipped between ~90
+     and ~72 from one run to the next, on every deploy including those before
+     the motion change that was first suspected.
+
+     `href` is `slides[0].url` — THE SAME VALUE `slideStyle` writes into
+     `url("…")`, read from the same place, never rebuilt. A preload matches a CSS
+     background fetch only when the URL is identical; one differing query param
+     and the image downloads twice, the first time at highest priority.
+
+     That is also why this lifts the IDEA from `HeroBackgroundImage.svelte` and
+     not its markup: that component preloads with `imagesrcset`, which is right
+     for the <img srcset> it renders and wrong here — a CSS background cannot
+     consume a srcset, so whichever candidate the browser chose would never be
+     the URL the stylesheet asks for. (The component itself cannot be used: it
+     renders an <img>, and these slides are the reference's `div.w-slide`
+     backgrounds, which the geometry gate diffs. matching/LEDGER.md has the line.)
+
+     Exactly ONE preload, for slide 0 only: every additional high-priority
+     preload competes with the real LCP. And none at all without an authored
+     image — the class defaults live in the stylesheet below, and no preload
+     beats one that might not match. -->
+<svelte:head>
+  {#if slides[0]?.url}
+    <link rel="preload" as="image" href={slides[0].url} fetchpriority="high" />
+  {/if}
+</svelte:head>
+
 <!-- Reference subtree, matching/spec/index.html chars 2663..4701:
        <div id="Gallery" class="section-2"><div … class="slider w-slider">
          <div class="_29-navy-logo-hero"><img … width="143" …/><div class="text-block">Creative Lofts <br/>for Lease</div></div>
