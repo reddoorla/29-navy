@@ -220,3 +220,85 @@ test.describe("the first burst is the first slide (#48)", () => {
     expect(cls, "cumulative layout shift").toBeLessThan(0.02);
   });
 });
+
+// The aerial has a SECOND consumer: the desktop Location band paints it as a CSS
+// background, and the band is `display: none` at <=767. Its url used to be an
+// inline `background-image`, which the browser resolves when the element is
+// parsed, whether or not the stylesheet that hides the band has arrived yet.
+// Measured on the 2026-09-21 deploy, a phone downloaded that 201KB original in
+// 13 of 20 loads, every fetch starting BEFORE the stylesheet finished. It went
+// unseen while the mobile <img> used the same URL, because the two shared one
+// request; giving the <img> its own renditions is what split them apart.
+test.describe("a phone never downloads the desktop band's photograph (#48)", () => {
+  test.skip(isPlaceholderRepo, "no CMS content: the band has no authored photograph");
+
+  const bandPhoto = (html: string) => {
+    const tag = /<div id="Location"[^>]*>/.exec(html)?.[0] ?? "";
+    const style = decodeHtml(/\bstyle="([^"]*)"/.exec(tag)?.[1] ?? "");
+    return { style, url: /--band-photo:\s*url\("([^"]+)"\)/.exec(style)?.[1] };
+  };
+
+  test("the server's HTML carries the photograph as a custom property", async ({ request }) => {
+    const { style, url } = bandPhoto(await (await request.get("/")).text());
+    expect(url, "an authored photograph on --band-photo").toBeTruthy();
+    expect(style).not.toContain("background-image");
+  });
+
+  test("a phone makes no request for it before any stylesheet has arrived", async ({
+    page,
+    request,
+  }) => {
+    const { url } = bandPhoto(await (await request.get("/")).text());
+    expect(url, "an authored photograph on --band-photo").toBeTruthy();
+
+    // The defect is a race against the stylesheet, and THIS HARNESS CANNOT LOSE
+    // IT: `vite dev` inlines the page's CSS into the document, so `display: none`
+    // is always known at first style resolution. Holding `.css` responses back
+    // was tried first and passed with the defect restored, i.e. it was vacuous.
+    // So the losing side of the race is modelled instead: the document is served
+    // with every stylesheet removed, which is exactly the moment in which
+    // production fetched the photograph. The markup alone must request nothing.
+    let stripped = 0;
+    await page.route(
+      (u) => u.pathname === "/",
+      async (route) => {
+        const response = await route.fetch();
+        const body = (await response.text())
+          .replace(/<style\b[\s\S]*?<\/style>/g, () => (stripped++, ""))
+          .replace(/<link\b[^>]*\brel="stylesheet"[^>]*>/g, () => (stripped++, ""));
+        await route.fulfill({ response, body });
+      },
+    );
+    const images: string[] = [];
+    page.on("request", (r) => {
+      if (r.resourceType() === "image") images.push(r.url());
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/", { waitUntil: "load" });
+
+    expect(stripped, "stylesheets removed from the served document").toBeGreaterThan(0);
+    // Positive evidence that the listener saw this load's images at all.
+    expect(images.length, "image requests observed").toBeGreaterThan(0);
+    expect(images.filter((u) => u === url)).toEqual([]);
+  });
+
+  test("the desktop band still paints it, fetched by the stylesheet", async ({ page, request }) => {
+    const { url } = bandPhoto(await (await request.get("/")).text());
+    expect(url, "an authored photograph on --band-photo").toBeTruthy();
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/", { waitUntil: "load" });
+
+    const band = page.locator("#Location");
+    await expect(band).toBeVisible();
+    expect(await band.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe(`url("${url}")`);
+    const initiators = await page.evaluate(
+      (name) =>
+        (performance.getEntriesByType("resource") as PerformanceResourceTiming[])
+          .filter((e) => e.name === name)
+          .map((e) => e.initiatorType),
+      url!,
+    );
+    expect(initiators).toEqual(["css"]);
+  });
+});

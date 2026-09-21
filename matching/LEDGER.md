@@ -763,3 +763,45 @@ What was lifted: the idea (`<svelte:head>`, `fetchpriority="high"`), its
 one-preload-per-page rule, and — from `utils/preloadHidden.ts` — the
 load-then-idle schedule, moved into `utils/afterLoadIdle.ts` so the slider and
 the modal warm-up share one implementation instead of two.
+
+### The aerial had a second consumer, and the blocking experiment hid it
+
+Found the same day, after the first A/B of the change above read 99, 95, 89, 87,
+90, 93 against production's 83, 74, 79, 78, 85, 92 — better in every round but
+the last, and not the flat 97 that blocking "slides 2–6 + aerial" had predicted.
+The blocking pattern was a URL match on `location-aerial`, so it removed BOTH
+consumers of that photograph; the change only re-pointed one.
+
+The other is `NavyLocationBand`: `div#Location.section` paints the aerial as a
+CSS background (ref css:2172) and is `display: none` at ≤767px (ref css:3228).
+Its authored url travelled as an inline `background-image`, and an inline
+declaration is resolved when the element is parsed — whether or not the
+stylesheet holding that `display: none` has arrived. Measured on the `d146bed`
+deploy at phone width, resource timing `initiatorType: "css"`:
+
+| loads                        | band's 201KB original downloaded |
+| ---------------------------- | -------------------------------- |
+| 412px, mobile emulation, ×10 | 6                                |
+| 390px, no emulation, ×10     | 7                                |
+| Lighthouse fix arm, ×6       | 5                                |
+
+In all 13 of the 20, the fetch started BEFORE the last stylesheet finished
+(e.g. `css@174` against `cssEnd=250`); in all 7 clean loads the stylesheet won.
+While the mobile `<img>` used the same URL the two shared one request, which is
+why production shows a single 201KB aerial and why this was invisible until the
+`<img>` got its own renditions.
+
+**Not a deviation: nothing rendered changes.** The url now travels as
+`--band-photo` on the element, the stylesheet's `.section` declares the
+reference's url() as that property's value and paints
+`background-image: var(--band-photo)`, both citing ref css:2172. The fetch
+therefore cannot start before the stylesheet that also carries `display: none`
+— which is how the reference itself behaves, its url() being in its stylesheet.
+On the production build the band reads 1440×900, `cover`, `50% 50%`, painted
+from the authored URL, in Chromium, Firefox and WebKit; at 390px none of the
+three requested it in 8 loads each. `NavyFloorPlans` already carries its trigger
+images this way (`--trigger-bg`) for an unrelated reason (ref css:2984, 3038).
+
+An explicit `background-image: none` inside the ≤767 block was considered and
+left out: it would be a declaration with no reference line behind it, and the
+measurement above shows no engine fetching once `display: none` is known.
