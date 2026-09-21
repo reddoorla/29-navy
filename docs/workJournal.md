@@ -2058,6 +2058,9 @@ session does not "finish" the bootstrap step by switching it.
 
 ## 2026-09-17 (later) — Enrolled, and the switch had already been thrown by hand (#41, `docs/enrollment-journal`)
 
+> Superseded in part by 2026-09-20 — The cockpit's errors were the unverified mirror,
+> come true.
+
 Second half of the review session above. That entry ends with the site live on
 `29navy.com` and the fleet row reading `Status: building`; this one closes the
 gap and corrects two things the first entry got wrong by not looking far enough.
@@ -2305,3 +2308,152 @@ A first attempt at that cadence measurement read 2177ms and was wrong — it beg
 mid-cycle, after an arrow click earlier in the same page had already restarted
 the delay. Timing the GAP between consecutive ticks rather than the wait for the
 first one is what makes the number independent of when you started watching.
+
+## 2026-09-20 — The cockpit's errors were the unverified mirror, come true (#47, `docs/journal-cockpit-row-half-enrolled`)
+
+Tucker saw errors against 29 Navy in the cockpit on the way to sending the
+maintenance email and asked what the story was. Nothing in this repo changed.
+The site was healthy the whole time: none of the last 60 workflow runs here is
+anything but a success, Netlify's published deploy is `ready`, `/health` answers
+`{"ok":true,"prismic":"ok"}`, the fleet's form sweep passes, and the draft
+carries P=91 A=100 BP=96 SEO=100. Every error was the fleet's _row_ for the
+site, and the row was wrong in two independent ways.
+
+### The belief the previous entry got wrong, and what it cost
+
+The 2026-09-17 (later) entry reset the `maintenance day` anchor and the `url`
+through a raw Airtable PATCH, flagged that a raw PATCH does not mirror into
+Turso, and then reasoned the risk away: _"Turso is not read by any inventory
+today … so nothing is consuming the drift; that stops being true the moment
+#646 lands."_ It was already false when it was written. reddoor-maintenance
+#859, `--fleet turso reads the fleet roster from Turso; airtable is a warning
+alias`, merged at 12:08 PDT that same day, hours before the entry. All six
+`--fleet` flags across the five nightly workflows read `turso`.
+
+The drift was consumed within a day. Turso still held the anchor
+**2025-01-22**; Airtable held **2026-09-17**. The `daily-reports` run of
+2026-09-18 13:41 UTC (run 35351658195) read Turso, found a Yearly schedule 8
+months overdue, and drafted `29 Navy — Maintenance — 2026-09-18` with period
+`2026-01` — exactly the back-dated report to the client that resetting the
+anchor was meant to prevent. Its log line:
+
+```
+• drafted but NOT queued: 29 Navy — Maintenance — 2026-09-18 — a higher-or-equal-tier report is already pending approval
+```
+
+Honest accounting: the back-dated report stayed out of the approval queue only
+because the real draft happened to be sitting there first. That is ordering, not
+a guard.
+
+What the raw PATCH carried and what it did not is uneven, and I did not
+establish why. `url` reached Turso (`https://29navy.com`). The anchor did not.
+The `legacy` blob did not either: Airtable says `"site host":"netlify"`, Turso
+still says `https://webflow.com/dashboard`. The likeliest cause is ordering
+against the `header-image` command's `SITE_MIRROR` write at 22:52:29Z, which
+would have carried whatever Airtable held at that moment, but that is a
+hypothesis and nothing here tested it.
+
+### The second defect, which the 17th never saw
+
+`Git repo` and `Netlify ID` were blank on the row in **both** stores, from
+bootstrap. Enrolment went through a hand-flipped `Status`, so nothing that sets
+them ever ran. For three nights every sweep that prepares a checkout skipped the
+site:
+
+```
+⚠ 1 site(s) skipped (could not prepare): 29-navy (site path does not exist (/tmp/fleet-smoke/29-navy) and no repoUrl or gitRepo is set — cannot clone)
+```
+
+`fleet-security`, `fleet-smoke` and `fleet-prismic-drift` all said this, and all
+three runs concluded **success**. A green sweep here means "nothing failed among
+the sites I could prepare", which is this file's first rule broken at fleet
+scale. The result was a `site_health` row with 38 of its 47 columns null —
+everything except the Lighthouse scores written by hand on the 17th and the
+Prismic verdict.
+
+What made it invisible: the cockpit's only trace was one watch-band item,
+"Prismic model check could not run — ⚠ NO VERDICT", which reads as a Prismic
+problem. Nothing said "this maintained site has never been measured". The
+operator met it as a Maintenance draft whose five gating checklist items all
+read "Not yet measured", with Approve disabled.
+
+### What was done
+
+Three fields, written through `setSiteDetail` with the same wiring
+`netlify/functions/site-details.mts` uses — Turso first and strict via
+`mirrorWrite`/`mirrorSiteField`, then the Airtable shadow via `updateSiteField`
+— so this time both stores moved together: `Git repo` = `reddoorla/29-navy`,
+`Netlify ID` = `0627e670-a816-48b2-bd32-b2e52c8d2103` (from Netlify's API,
+matching `.netlify/state.json`), `maintenance day` = `2026-09-17`. Read back
+before and after from both.
+
+Evidence afterwards, all read-only: the Turso roster resolves `29-navy` with a
+repo, a deployed URL and a Netlify ID, and none of its 14 sites lacks a repo;
+`preflight 29-navy --type Maintenance` reads **0 fail, 0 warn** with the
+stale-anchor warning gone; `db parity` reports no mismatch on any of the three
+fields.
+
+**That is roster-level evidence, not a measured site.** The proof is a sweep
+that clones the repo and writes health, and none has run since the fix. The
+crons are 05:00 (`fleet-prismic-drift`), 06:00 (`fleet-security`) and 10:00 UTC
+(`fleet-smoke`), and on 2026-09-20 they actually started at 09:34, 10:19 and
+13:52 — about four hours late. Until one of them names 29-navy without the word
+"skipped", this is a hypothesis with good supporting evidence.
+
+### What was not done, and why
+
+- **Dispatching the sweeps by hand** was refused by the session's permission
+  layer as interference with shared workloads. They run on schedule regardless.
+- **Deleting the stray `2026-01` draft** (`report_01M2TC2JJBRABM3DFPH88ATBAX`,
+  Turso-only, never queued) was refused as an irreversible deletion. A guarded
+  script that backs the row up first was left for the operator.
+- **The 2026-09-17 draft cannot be repaired in place.** `autoTickChecklist` runs
+  in one place, `draftReportForSite`, on the path that creates a row
+  (`src/reports/draft.ts:363`); the `completeRowId` path returns before it and
+  `rerenderReport` regenerates HTML only. The dashboard renders the evidence
+  stored on the report, not live health. So a report drafted before its site was
+  ever measured reads "Not yet measured" forever. Once health lands it needs
+  discarding and re-drafting with `report 29-navy --type Maintenance`, and there
+  is no sanctioned discard — the only `deleteFrom("reports")` in that codebase
+  is the import reaper.
+- `Launched at` is null in both stores. Nothing reads it (one type in
+  `src/fleet/site-row.ts`), so it was left alone.
+
+### Tried and abandoned: measuring one site from here
+
+The idea was to run the smoke and security audits for this site alone and write
+them back, so the draft could be replaced tonight. `audit [site]` cannot be
+combined with `--fleet turso` — `resolve-sites.ts` throws _"cannot combine a
+positional [site] with --fleet"_ — so that flag always sweeps all 14 sites and,
+with `--write-back`, rewrites health for all 14. The JSON inventory is the
+supported one-site route, but its schema has no `netlifyId`, so `netlify-deploy`
+would skip and the run would differ from the nightly it stands in for. Abandoned
+rather than put improvised health into a production table that the real sweep
+overwrites within hours. A site filter on the Turso roster is what would revive
+it.
+
+### Three smaller things that cost time
+
+The reddoor-maintenance checkout's CLI would not start: 39 top-level
+`node_modules` symlinks pointed into `../../rm853-red/…`, a directory that no
+longer exists, so `dist/cli/bin.js` died on `cac`. pnpm 11 refuses to purge a
+modules directory without a TTY; `CI=true pnpm install --offline
+--frozen-lockfile` relinked it in 18s.
+
+`pnpm exec tsx …` ran a dependency check that took 45.7s on one call, which was
+enough to push read-only commands past a 120s tool timeout.
+`./node_modules/.bin/tsx` skips it.
+
+`db parity` reported `mismatches=25`, and 21 of them are not drift: 17 are
+`last_commit_at` spelled `…38.000Z` in Airtable and `…38Z` in Turso, and 4 are
+`links_ok` empty versus `0`. The four real lines — this site's `legacy` blob, a
+Turso-only site, and the stray report — were easy to read past. Parity is the
+only detector for a write that reached one store, and it was 84% noise on the
+day it was needed.
+
+Filed in reddoor-maintenance, since none of it is fixable from a site repo:
+**#889** (a maintained site with a blank `Git repo` is skipped and nothing
+alarms), **#890** (checklist evidence frozen at draft time, no re-tick, no
+discard), **#891** (parity false positives). The "secret-scanning alerts
+unreadable" gap the security sweep prints for this repo is printed for every
+repo in the org and is already #754.
