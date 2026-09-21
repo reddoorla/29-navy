@@ -2311,6 +2311,9 @@ first one is what makes the number independent of when you started watching.
 
 ## 2026-09-20 — The cockpit's errors were the unverified mirror, come true (#47, `docs/journal-cockpit-row-half-enrolled`)
 
+> Superseded in part by 2026-09-21 — The sweeps measured the site, and the first real
+> number was a coin flip.
+
 Tucker saw errors against 29 Navy in the cockpit on the way to sending the
 maintenance email and asked what the story was. Nothing in this repo changed.
 The site was healthy the whole time: none of the last 60 workflow runs here is
@@ -2457,3 +2460,103 @@ alarms), **#890** (checklist evidence frozen at draft time, no re-tick, no
 discard), **#891** (parity false positives). The "secret-scanning alerts
 unreadable" gap the security sweep prints for this repo is printed for every
 repo in the org and is already #754.
+
+## 2026-09-21 — The sweeps measured the site, and the first real number was a coin flip (#49, `docs/journal-sweeps-measured-lcp-bimodal`)
+
+Yesterday's entry stopped on roster-level evidence and called the row fix "a
+hypothesis with good supporting evidence" until a sweep named 29-navy without
+the word "skipped". This morning all of them did. Nothing in this repo changed
+today either.
+
+### The row fix, proven
+
+| Sweep                 | Run         | What it said about 29-navy                                         |
+| --------------------- | ----------- | ------------------------------------------------------------------ |
+| `fleet-prismic-drift` | 35588297867 | `[29-navy] @ caef74f2f6d3 Prismic models`, verdict `pass`          |
+| `fleet-security`      | 35594402870 | `security pass`, `deps pass`                                       |
+| `fleet-lighthouse`    | 35615432191 | `netlify-deploy`, `domain`, `function-health` pass; `browser` warn |
+| `fleet-smoke`         | 35623690253 | `✔ 29-navy: all green (52s)`                                       |
+
+`site_health` went from 9 of 47 columns populated to **40**. The Prismic "NO
+VERDICT" item that started all this is gone. `daily-reports` recomputed
+`next_maintenance_at` to **2027-09-17**, so the stale anchor can no longer draft
+a back-dated report. A read-only dry run of `autoTickChecklist` against the live
+row returns `pass` for all five gating Maintenance items, each stamped today.
+
+Two corrections to yesterday's entry. It recorded the crons as starting "about
+four hours late"; today they started between 5h21 and 6h55 late (05:00 → 10:21,
+06:00 → 11:30, 08:00 → 14:55, 09:23 → 15:56, 10:00 → 16:08, 10:15 → 16:28 UTC).
+Plan on a morning in Los Angeles, not the small hours. And it says deleting the
+stray `2026-01` draft was refused: Tucker ran the guarded script that
+evening. Verified read-only — that id now counts 0, and the site's one remaining
+report is `rec67VEr1fwaZyNtv`, the 2026-09-17 draft, still queued, still reading
+"Not yet measured" on all five items exactly as reddoor-maintenance#890
+predicts.
+
+### The first real measurement raised a new flag
+
+`fleet-lighthouse` scored **performance 72** against the cockpit's floor of 75,
+which is now the only attention item on the site. The run on the 17th, from this
+machine, had said 91. The only site change between the two was #46, the hero
+motion change, so I suspected it. **That was wrong, and the way it was disproved
+is the reusable part.**
+
+Netlify serves every production deploy forever at
+`https://<deploy id>--29-navy.netlify.app/` — 200, no redirect to the apex. So a
+before/after can be measured days later under identical conditions. Nine
+Lighthouse runs, performance only, default mobile emulation, one machine, order
+rotated each round so load drift favours nobody:
+
+| Deploy           | Commit    | Scores     | Median LCP |
+| ---------------- | --------- | ---------- | ---------- |
+| before #46       | `796d97f` | 86, 80, 79 | 5281 ms    |
+| #46, first build | `2d746c6` | 90, 91, 92 | 2709 ms    |
+| current          | `caef74f` | 94, 88, 79 | 3153 ms    |
+
+#46 is cleared: the deploy from before it scores worst. What the table shows
+instead is that the score is **bimodal on every deploy**. TBT is 0 in eight of
+nine runs and FCP holds at about 1.35s; the entire spread is LCP. The LCP
+element is the same in all nine runs — the first hero slide, `div.slide-6`,
+which paints its photograph as a CSS `background-image` on a `div`. The preload
+scanner cannot see a background image, so it is discovered only after style
+resolution:
+
+| Mode | Load delay | Load time | Render delay | LCP      | Score |
+| ---- | ---------- | --------- | ------------ | -------- | ----- |
+| good | 1.1–1.5s   | 0.4–0.55s | under 0.15s  | 2.3–2.7s | 86–94 |
+| bad  | 2.3–2.4s   | 1.5–1.9s  | 0.3–1.2s     | 5.3–5.7s | 79–80 |
+
+The bad mode on a slower CI runner is the 72. Honest accounting: **the 91
+written onto the row on the 17th, and printed in the pending client email, was
+the favourable half of a coin flip**, not the site's performance. Every nightly
+run re-flips it, so the cockpit will flap, and `draftReportForSite` takes its
+scores from the row (`scoresFromWebsite`, `src/reports/draft.ts:153`), so a
+report drafted the morning after a bad-mode night carries that number to the
+client. Re-drafting today would put 72 in Worthe's inbox.
+
+The fix is a preload of the first slide's image from `<svelte:head>`, with the
+identical URL the slide's inline style emits, which leaves the transcribed slice
+DOM alone. Not done here; filed as **#48** with the numbers above.
+
+### Seen and not established
+
+Builds with #46 show a layout shift on `div#Lofts` scoring 0.115–0.142 in five
+of six runs; the deploy from before #46 shows none in three. But no bad-LCP run
+on any deploy shows it, so it may follow load timing as much as #46. Three runs
+per arm cannot attribute it. It is in #48 as unconfirmed.
+
+The same CI run reported the desktop homepage failing in Firefox and WebKit. The
+identical browser audit run from here the same afternoon passed in all three
+engines with 0 of 7 links broken. One data point, not reproduced, and
+`crossbrowser_ok` sits at 0 on the row until tomorrow's run overwrites it.
+
+### Two small costs
+
+The fleet's Lighthouse audit deletes `.lighthouseci/` around each run, so its
+JSON output gives four category scores and nothing else. The metric breakdown
+had to come from driving the `lighthouse` CLI directly out of
+reddoor-maintenance's `node_modules`.
+
+A `find` for result files across this checkout ran past a 120s timeout in
+`node_modules`. Looking where the code says it writes (`site.path/.lighthouseci`,
+`src/audits/lighthouse.ts:182`) would have answered in a second.
