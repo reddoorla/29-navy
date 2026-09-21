@@ -683,8 +683,12 @@ always going to be.
 The reference's aerial `<img>` carries no `width`/`height`, so it needs no
 `height: auto`, and neither did ours. Ours now carries both, from the authored
 Prismic dimensions, because the aerial landing in an unreserved box IS the
-layout shift on `div#Lofts`: **0.115–0.142** in every production run where the
-image loaded, **0.009** in every run where it was blocked (2026-09-21, 31 runs).
+layout shift on `div#Lofts`. Counted from the 24 blocking runs of 2026-09-21
+against production: **0.124–0.142 in 8 of the 11 runs where the image was
+allowed to load** and 0.009 in the other 3, where it happened to arrive before
+the page was laid out; **never above 0.009 in the 13 runs where it was
+blocked.** (An earlier wording here said "every run where the image loaded" and
+"31 runs". Both were wrong, and the logs are what corrected them.)
 
 Those attributes are presentational hints for both axes. `img { max-width:
 100% }` (ref css:235) caps the width; without `height: auto` the height would
@@ -805,3 +809,25 @@ images this way (`--trigger-bg`) for an unrelated reason (ref css:2984, 3038).
 An explicit `background-image: none` inside the ≤767 block was considered and
 left out: it would be a declaration with no reference line behind it, and the
 measurement above shows no engine fetching once `display: none` is known.
+
+### The measurement that closed #48
+
+Twelve Lighthouse runs, performance only, default mobile emulation, production's
+permalink against the `071a205` deploy, order alternated each round, **nothing
+else running on the machine**:
+
+| Arm                    | Scores                 | Simulated LCP | Layout shift           |
+| ---------------------- | ---------------------- | ------------- | ---------------------- |
+| production, `caef74f`  | 92, 92, 78, 88, 72, 89 | 2465–5984 ms  | 0.124–0.142 in 5 of 6  |
+| this branch, `071a205` | 95, 93, 96, 97, 95, 95 | 2643–3221 ms  | 0.009 in 5, 0.000 in 1 |
+
+Production reproduced the fleet sweep's 72 in the same sitting. What separates
+the runs is the weight of the images that had FINISHED before the hero was
+observed to paint, which is what the simulator then charges against it:
+production 154, 189, 208, 349, 541, 770 KB scoring 92, 92, 88, 89, 78, 72; this
+branch 149–205 KB in all six, the band's original fetched in none of them.
+
+The idle machine is part of the result. The same comparison run while prettier,
+node and `gh` were in use read 88, 95, 87, 95, 96 for this branch, the 88 and 87
+carrying 317 and 357 ms of blocking time that no idle run has ever shown, plus
+one `NO_NAVSTART` trace failure. Measure with the machine left alone.
