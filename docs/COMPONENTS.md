@@ -62,6 +62,7 @@ source. It is the fastest way to recognise what a thing does.
 | [`viewport.svelte.ts`](../src/lib/stores/viewport.svelte.ts) | `viewport` | — |  |
 | [`transitions.ts`](../src/lib/transitions.ts) | `prefersReducedMotion`, `fade`, `fly`, `slide` | 8 |  |
 | [`turnstile.ts`](../src/lib/turnstile.ts) | `loadTurnstile` | — | Cloudflare Turnstile explicit-render helper |
+| [`afterLoadIdle.ts`](../src/lib/utils/afterLoadIdle.ts) | `afterLoadIdle` | 5 | Run `callback` once the page has finished loading AND the main thread has gone quiet |
 | [`countup.ts`](../src/lib/utils/countup.ts) | `formatCount` | 6 |  |
 | [`createUniqueId.ts`](../src/lib/utils/createUniqueId.ts) | `createUniqueId` | 2 |  |
 | [`image.ts`](../src/lib/utils/image.ts) | `DEFAULT_IMAGE_WIDTHS`, `isPrismicImageUrl`, `imgix`, `srcset` | 17 | Helpers for serving responsively-sized Prismic (imgix) images |
@@ -71,4 +72,4 @@ source. It is the fastest way to recognise what a thing does.
 | [`richTextHeadings.ts`](../src/lib/utils/richTextHeadings.ts) | `RT_HEADING_CTX`, `defaultLevel`, `buildHeadingLevelMap` | 9 | Editors author arbitrary heading levels inside Prismic rich-text bodies (heading1–6 are all enabled in the slice models) |
 | [`vimeo.ts`](../src/lib/utils/vimeo.ts) | `checkVimeoVideo` | 5 | True when the Vimeo video exists and is embeddable (oEmbed responds 200) |
 
-50 modules, 307 tests behind them.
+51 modules, 312 tests behind them.

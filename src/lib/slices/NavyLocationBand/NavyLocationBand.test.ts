@@ -90,10 +90,20 @@ describe("NavyLocationBand slice", () => {
     expect(SOURCE).not.toMatch(/-p-(500|800|1080)/);
   });
 
-  it("inlines only the photo URL — every measurable value stays in the cited CSS", () => {
+  it("carries the photo as a custom property, never as an inline background-image", () => {
+    // #48. An inline `background-image` is resolved the moment the element is
+    // parsed, while the `display: none` that hides this band at <=767 sits in a
+    // stylesheet that may still be on the wire. Measured on the 2026-09-21
+    // deploy: a phone downloaded this 201KB photograph, for a band it never
+    // shows, in 13 of 20 loads, and every one of those fetches STARTED BEFORE
+    // the stylesheet finished. A custom property fetches nothing by itself: the
+    // fetch now waits for the stylesheet's `background-image: var(--band-photo)`,
+    // which arrives together with the rule that hides the band.
     const { container } = render(NavyLocationBand, { props: { slice } });
     const style = container.querySelector("div#Location")!.getAttribute("style") ?? "";
-    expect(style).toContain(`url("${PHOTO}")`);
+    // jsdom serialises the attribute with a trailing semicolon; a browser does not.
+    expect(style.replace(/;\s*$/, "")).toBe(`--band-photo: url("${PHOTO}")`);
+    expect(style).not.toContain("background-image");
     for (const measurable of ["height", "background-position", "background-size", "cover", "vh"])
       expect(style).not.toContain(measurable);
   });
@@ -108,7 +118,10 @@ describe("NavyLocationBand slice", () => {
     const { container } = render(NavyLocationBand, { props: { slice: bare } });
     const band = container.querySelector("div#Location")!;
     expect(band.hasAttribute("style")).toBe(false);
-    expect(CSS).toContain(`background-image: url("${PHOTO}")`);
+    // The reference's url() is the custom property's stylesheet value, which an
+    // authored photo overrides inline. One `background-image` serves both.
+    expect(ruleBody(".section")).toContain(`--band-photo: url("${PHOTO}");`);
+    expect(ruleBody(".section")).toContain("background-image: var(--band-photo);");
   });
 
   it("keeps id=\"Location\" — the navbar's <a href='#Location'> target", () => {
@@ -144,8 +157,8 @@ describe("NavyLocationBand slice", () => {
   // live in the CSS are asserted against the file the browser will get.
 
   it("cites a reference line on every declaration in the style block", () => {
-    // 1 box-sizing + 5 on .section + 1 display:none + 2 on .div-block-3 + 9 on .heading.
-    expect(DECLARATIONS.length).toBeGreaterThanOrEqual(18);
+    // 1 box-sizing + 6 on .section + 1 display:none + 2 on .div-block-3 + 9 on .heading.
+    expect(DECLARATIONS.length).toBeGreaterThanOrEqual(19);
     const uncited = DECLARATIONS.filter((l) => !/\/\* ref css:\d+/.test(l));
     expect(uncited).toEqual([]);
   });

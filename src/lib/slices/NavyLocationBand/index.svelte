@@ -20,8 +20,20 @@
   // repeat, the fit and the 100vh height — stays in the style block below where
   // it can be cited line by line (ref css:2173-2176). An authored photo simply
   // overrides the reference's own url() from ref css:2172.
+  //
+  // It travels as a custom property, never as an inline `background-image`
+  // (#48). An inline one is resolved the moment the element is parsed, while
+  // the `display: none` that hides this band at <=767 sits in a stylesheet that
+  // may still be on the wire: measured on the 2026-09-21 deploy, a phone
+  // downloaded this 201KB photograph for a band it never shows in 13 of 20
+  // loads, and every one of those fetches started before the stylesheet
+  // finished. A custom property fetches nothing by itself: the fetch now waits
+  // for the stylesheet's `background-image: var(--band-photo)`, which arrives
+  // together with the rule that hides the band — and that is how the reference
+  // behaves, its url() being in its stylesheet too. NavyFloorPlans carries its
+  // trigger images the same way (`--trigger-bg`), for another reason.
   const photo = $derived(slice.primary.background_image?.url ?? undefined);
-  const bandStyle = $derived(photo ? `background-image: url("${photo}")` : undefined);
+  const bandStyle = $derived(photo ? `--band-photo: url("${photo}")` : undefined);
 </script>
 
 <!-- Reference subtree, verbatim (matching/spec/index.html):
@@ -60,7 +72,8 @@
   }
 
   .section {
-    background-image: url("/29navy/assets/614ddffddb6b8587d3d41004_location-aerial.jpg"); /* ref css:2172 */
+    --band-photo: url("/29navy/assets/614ddffddb6b8587d3d41004_location-aerial.jpg"); /* ref css:2172 — its url(); an authored photo overrides this inline */
+    background-image: var(--band-photo); /* ref css:2172 — its property */
     background-position: 50%; /* ref css:2173 — one value means 50% 50%, dead centre */
     background-repeat: no-repeat; /* ref css:2174 */
     background-size: cover; /* ref css:2175 */

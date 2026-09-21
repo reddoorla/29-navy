@@ -669,3 +669,165 @@ claims to have outlived — so it would have gone green while measuring nothing.
 Respelled as `DELAY_MS - 1` arithmetic, which cannot rot at any delay. The old
 spelling was correct at 3000 and silently vacuous at 5000; a timing change is
 precisely when that class of test stops working and nothing says so.
+
+## Post-close — the hero's first burst becomes its first slide (2026-09-21, #48, #52)
+
+Performance work, on a page that can no longer be gated: `29navy.com` serves
+this build, so `checkRef()` refuses and `bash matching/gate.sh` cannot run at
+any tag. What stands in for the gate is stated per item below. Nothing here
+changes a settled frame; two things change WHEN a frame becomes what it was
+always going to be.
+
+### [deviation] `.image-18 { height: auto }` at ≤767px — not in the reference
+
+The reference's aerial `<img>` carries no `width`/`height`, so it needs no
+`height: auto`, and neither did ours. Ours now carries both, from the authored
+Prismic dimensions, because the aerial landing in an unreserved box IS the
+layout shift on `div#Lofts`. Counted from the 24 blocking runs of 2026-09-21
+against production: **0.124–0.142 in 8 of the 11 runs where the image was
+allowed to load** and 0.009 in the other 3, where it happened to arrive before
+the page was laid out; **never above 0.009 in the 13 runs where it was
+blocked.** (An earlier wording here said "every run where the image loaded" and
+"31 runs". Both were wrong, and the logs are what corrected them.)
+
+Those attributes are presentational hints for both axes. `img { max-width:
+100% }` (ref css:235) caps the width; without `height: auto` the height would
+stay at the full authored pixel height. With it, used height = used width ÷
+aspect ratio — what the bare `<img>` resolved to once loaded.
+
+`height: auto` itself moves nothing. Standing in for the gate, `.image-18` and
+`#Lofts` measured after full load, production against this build's production
+bundle:
+
+| Viewport | Aerial, production | Aerial, this build | `#Lofts` top    |
+| -------- | ------------------ | ------------------ | --------------- |
+| 390      | 389.97 × 209.86    | 390 × 209.63       | 691.86 → 691.63 |
+| 767      | 766.98 × 412.73    | 767 × 412.45       | 984.73 → 984.45 |
+
+The aerial is **0.23px / 0.28px shorter** and everything below it rises by the
+same amount. That is the srcset below, not this rule: see the next item.
+
+### [deviation] slides 2–6 say `background-image: none` until load + idle
+
+At first paint only slide 0 carries its photograph. The other five carry an
+explicit `none`, replaced by their authored URL once `load` has fired and the
+main thread is idle, or the moment a visitor navigates. They are off-screen in
+every frame the gate ever photographed at rest, so no settled frame differs.
+
+The `none` is load-bearing: each slide class has a default photograph in the
+stylesheet (ref css:2231-2251, the captured JPEGs), and an omitted declaration
+falls through to it — five unoptimised local JPEGs at first paint, then the five
+authored ones after idle. jsdom cannot see that; the smoke spec watches the real
+network and fails on it.
+
+Autoplay skips any tick that lands before they are painted, so a slow
+connection never slides onto the slider's bare grey background.
+
+### The aerial gains a `srcset` ladder — not a deviation in any rendered box
+
+`480w, 768w, 1024w, 1440w` via imgix, `sizes="100vw"`. The image is displayed at
+≤767px only and its wrapper is full-bleed there, so `100vw` is its used width.
+201KB unsized, ~25KB at 768w.
+
+It is NOT pixel-neutral, and the first draft of this entry said it was. imgix
+rounds each rendition's height to a whole pixel — 480w is 480×258 (1.8605) and
+768w is 768×413 (1.8596), against the master's 1600×861 (1.8583) — and once the
+image has loaded the browser uses the loaded resource's ratio, not the
+attributes'. Hence the 0.23px and 0.28px in the table above. No width in the
+ladder avoids it: 1600 and 861 share no factor, so only the master itself
+divides evenly. Accepted as sub-pixel, on an element with no gate left to
+answer to; recorded so that nobody later measures it and goes looking for a
+regression. The captured `/29navy/assets` fallback is not a Prismic URL, gets no
+srcset and no attributes, and renders exactly as before.
+
+**Deliberately NOT done: `NavyContact`'s photograph.** It is 304KB and its only
+srcset candidate is the unsized 4240px master, which looks like the obvious next
+win. That single candidate is the panel's geometry (see the note in the slice:
+`sizes="100vw"` over a w-descriptor is what lands the panel on 373.34px), and the
+blocking experiment shows it does not govern the score: contact blocked alone
+read 74, 73, 85; slides and aerial blocked with contact still loading read
+97, 96, 98.
+
+### Checked and rejected, so the next session does not re-derive it
+
+`components/HeroBackgroundImage.svelte` is the starter's answer to an LCP hero
+— a preload in `<svelte:head>` — and `docs/COMPONENTS.md` surfaced it before
+anything was written. Reuse is blocked twice over:
+
+- **The markup.** It renders an `<img>`. These slides are the reference's
+  `div.w-slide` elements painting CSS backgrounds, and the gate diffed that
+  subtree against the transcribed Webflow DOM.
+- **The preload itself, which is the part worth writing down.** It preloads with
+  `imagesrcset` + `imagesizes`, correct for the `<img srcset>` it renders and
+  wrong for a CSS background: a background cannot consume a srcset, so whichever
+  candidate the browser chose would never be the URL the stylesheet asks for,
+  and the photograph would download twice — once at highest priority.
+
+What was lifted: the idea (`<svelte:head>`, `fetchpriority="high"`), its
+one-preload-per-page rule, and — from `utils/preloadHidden.ts` — the
+load-then-idle schedule, moved into `utils/afterLoadIdle.ts` so the slider and
+the modal warm-up share one implementation instead of two.
+
+### The aerial had a second consumer, and the blocking experiment hid it
+
+Found the same day, after the first A/B of the change above read 99, 95, 89, 87,
+90, 93 against production's 83, 74, 79, 78, 85, 92 — better in every round but
+the last, and not the flat 97 that blocking "slides 2–6 + aerial" had predicted.
+The blocking pattern was a URL match on `location-aerial`, so it removed BOTH
+consumers of that photograph; the change only re-pointed one.
+
+The other is `NavyLocationBand`: `div#Location.section` paints the aerial as a
+CSS background (ref css:2172) and is `display: none` at ≤767px (ref css:3228).
+Its authored url travelled as an inline `background-image`, and an inline
+declaration is resolved when the element is parsed — whether or not the
+stylesheet holding that `display: none` has arrived. Measured on the `d146bed`
+deploy at phone width, resource timing `initiatorType: "css"`:
+
+| loads                        | band's 201KB original downloaded |
+| ---------------------------- | -------------------------------- |
+| 412px, mobile emulation, ×10 | 6                                |
+| 390px, no emulation, ×10     | 7                                |
+| Lighthouse fix arm, ×6       | 5                                |
+
+In all 13 of the 20, the fetch started BEFORE the last stylesheet finished
+(e.g. `css@174` against `cssEnd=250`); in all 7 clean loads the stylesheet won.
+While the mobile `<img>` used the same URL the two shared one request, which is
+why production shows a single 201KB aerial and why this was invisible until the
+`<img>` got its own renditions.
+
+**Not a deviation: nothing rendered changes.** The url now travels as
+`--band-photo` on the element, the stylesheet's `.section` declares the
+reference's url() as that property's value and paints
+`background-image: var(--band-photo)`, both citing ref css:2172. The fetch
+therefore cannot start before the stylesheet that also carries `display: none`
+— which is how the reference itself behaves, its url() being in its stylesheet.
+On the production build the band reads 1440×900, `cover`, `50% 50%`, painted
+from the authored URL, in Chromium, Firefox and WebKit; at 390px none of the
+three requested it in 8 loads each. `NavyFloorPlans` already carries its trigger
+images this way (`--trigger-bg`) for an unrelated reason (ref css:2984, 3038).
+
+An explicit `background-image: none` inside the ≤767 block was considered and
+left out: it would be a declaration with no reference line behind it, and the
+measurement above shows no engine fetching once `display: none` is known.
+
+### The measurement that closed #48
+
+Twelve Lighthouse runs, performance only, default mobile emulation, production's
+permalink against the `071a205` deploy, order alternated each round, **nothing
+else running on the machine**:
+
+| Arm                    | Scores                 | Simulated LCP | Layout shift           |
+| ---------------------- | ---------------------- | ------------- | ---------------------- |
+| production, `caef74f`  | 92, 92, 78, 88, 72, 89 | 2465–5984 ms  | 0.124–0.142 in 5 of 6  |
+| this branch, `071a205` | 95, 93, 96, 97, 95, 95 | 2643–3221 ms  | 0.009 in 5, 0.000 in 1 |
+
+Production reproduced the fleet sweep's 72 in the same sitting. What separates
+the runs is the weight of the images that had FINISHED before the hero was
+observed to paint, which is what the simulator then charges against it:
+production 154, 189, 208, 349, 541, 770 KB scoring 92, 92, 88, 89, 78, 72; this
+branch 149–205 KB in all six, the band's original fetched in none of them.
+
+The idle machine is part of the result. The same comparison run while prettier,
+node and `gh` were in use read 88, 95, 87, 95, 96 for this branch, the 88 and 87
+carrying 317 and 357 ms of blocking time that no idle run has ever shown, plus
+one `NO_NAVSTART` trace failure. Measure with the machine left alone.

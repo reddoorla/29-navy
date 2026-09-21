@@ -2311,6 +2311,9 @@ first one is what makes the number independent of when you started watching.
 
 ## 2026-09-20 — The cockpit's errors were the unverified mirror, come true (#47, `docs/journal-cockpit-row-half-enrolled`)
 
+> Superseded in part by 2026-09-21 — The sweeps measured the site, and the first real
+> number was a coin flip.
+
 Tucker saw errors against 29 Navy in the cockpit on the way to sending the
 maintenance email and asked what the story was. Nothing in this repo changed.
 The site was healthy the whole time: none of the last 60 workflow runs here is
@@ -2457,3 +2460,271 @@ alarms), **#890** (checklist evidence frozen at draft time, no re-tick, no
 discard), **#891** (parity false positives). The "secret-scanning alerts
 unreadable" gap the security sweep prints for this repo is printed for every
 repo in the org and is already #754.
+
+## 2026-09-21 — The sweeps measured the site, and the first real number was a coin flip (#49, `docs/journal-sweeps-measured-lcp-bimodal`)
+
+> Superseded in part by 2026-09-21 (later) — The preload was the wrong fix, and the experiment that found the right one hid half of it.
+
+Yesterday's entry stopped on roster-level evidence and called the row fix "a
+hypothesis with good supporting evidence" until a sweep named 29-navy without
+the word "skipped". This morning all of them did. Nothing in this repo changed
+today either.
+
+### The row fix, proven
+
+| Sweep                 | Run         | What it said about 29-navy                                         |
+| --------------------- | ----------- | ------------------------------------------------------------------ |
+| `fleet-prismic-drift` | 35588297867 | `[29-navy] @ caef74f2f6d3 Prismic models`, verdict `pass`          |
+| `fleet-security`      | 35594402870 | `security pass`, `deps pass`                                       |
+| `fleet-lighthouse`    | 35615432191 | `netlify-deploy`, `domain`, `function-health` pass; `browser` warn |
+| `fleet-smoke`         | 35623690253 | `✔ 29-navy: all green (52s)`                                       |
+
+`site_health` went from 9 of 47 columns populated to **40**. The Prismic "NO
+VERDICT" item that started all this is gone. `daily-reports` recomputed
+`next_maintenance_at` to **2027-09-17**, so the stale anchor can no longer draft
+a back-dated report. A read-only dry run of `autoTickChecklist` against the live
+row returns `pass` for all five gating Maintenance items, each stamped today.
+
+Two corrections to yesterday's entry. It recorded the crons as starting "about
+four hours late"; today they started between 5h21 and 6h55 late (05:00 → 10:21,
+06:00 → 11:30, 08:00 → 14:55, 09:23 → 15:56, 10:00 → 16:08, 10:15 → 16:28 UTC).
+Plan on a morning in Los Angeles, not the small hours. And it says deleting the
+stray `2026-01` draft was refused: Tucker ran the guarded script that
+evening. Verified read-only — that id now counts 0, and the site's one remaining
+report is `rec67VEr1fwaZyNtv`, the 2026-09-17 draft, still queued, still reading
+"Not yet measured" on all five items exactly as reddoor-maintenance#890
+predicts.
+
+### The first real measurement raised a new flag
+
+`fleet-lighthouse` scored **performance 72** against the cockpit's floor of 75,
+which is now the only attention item on the site. The run on the 17th, from this
+machine, had said 91. The only site change between the two was #46, the hero
+motion change, so I suspected it. **That was wrong, and the way it was disproved
+is the reusable part.**
+
+Netlify serves every production deploy forever at
+`https://<deploy id>--29-navy.netlify.app/` — 200, no redirect to the apex. So a
+before/after can be measured days later under identical conditions. Nine
+Lighthouse runs, performance only, default mobile emulation, one machine, order
+rotated each round so load drift favours nobody:
+
+| Deploy           | Commit    | Scores     | Median LCP |
+| ---------------- | --------- | ---------- | ---------- |
+| before #46       | `796d97f` | 86, 80, 79 | 5281 ms    |
+| #46, first build | `2d746c6` | 90, 91, 92 | 2709 ms    |
+| current          | `caef74f` | 94, 88, 79 | 3153 ms    |
+
+#46 is cleared: the deploy from before it scores worst. What the table shows
+instead is that the score is **bimodal on every deploy**. TBT is 0 in eight of
+nine runs and FCP holds at about 1.35s; the entire spread is LCP. The LCP
+element is the same in all nine runs — the first hero slide, `div.slide-6`,
+which paints its photograph as a CSS `background-image` on a `div`. The preload
+scanner cannot see a background image, so it is discovered only after style
+resolution:
+
+| Mode | Load delay | Load time | Render delay | LCP      | Score |
+| ---- | ---------- | --------- | ------------ | -------- | ----- |
+| good | 1.1–1.5s   | 0.4–0.55s | under 0.15s  | 2.3–2.7s | 86–94 |
+| bad  | 2.3–2.4s   | 1.5–1.9s  | 0.3–1.2s     | 5.3–5.7s | 79–80 |
+
+The bad mode on a slower CI runner is the 72. Honest accounting: **the 91
+written onto the row on the 17th, and printed in the pending client email, was
+the favourable half of a coin flip**, not the site's performance. Every nightly
+run re-flips it, so the cockpit will flap, and `draftReportForSite` takes its
+scores from the row (`scoresFromWebsite`, `src/reports/draft.ts:153`), so a
+report drafted the morning after a bad-mode night carries that number to the
+client. Re-drafting today would put 72 in Worthe's inbox.
+
+The fix is a preload of the first slide's image from `<svelte:head>`, with the
+identical URL the slide's inline style emits, which leaves the transcribed slice
+DOM alone. Not done here; filed as **#48** with the numbers above.
+
+### Seen and not established
+
+Builds with #46 show a layout shift on `div#Lofts` scoring 0.115–0.142 in five
+of six runs; the deploy from before #46 shows none in three. But no bad-LCP run
+on any deploy shows it, so it may follow load timing as much as #46. Three runs
+per arm cannot attribute it. It is in #48 as unconfirmed.
+
+The same CI run reported the desktop homepage failing in Firefox and WebKit. The
+identical browser audit run from here the same afternoon passed in all three
+engines with 0 of 7 links broken. One data point, not reproduced, and
+`crossbrowser_ok` sits at 0 on the row until tomorrow's run overwrites it.
+
+### Two small costs
+
+The fleet's Lighthouse audit deletes `.lighthouseci/` around each run, so its
+JSON output gives four category scores and nothing else. The metric breakdown
+had to come from driving the `lighthouse` CLI directly out of
+reddoor-maintenance's `node_modules`.
+
+A `find` for result files across this checkout ran past a 120s timeout in
+`node_modules`. Looking where the code says it writes (`site.path/.lighthouseci`,
+`src/audits/lighthouse.ts:182`) would have answered in a second.
+
+## 2026-09-21 (later) — The preload was the wrong fix, and the experiment that found the right one hid half of it (#52, `fix/hero-lcp-preload`)
+
+The entry above ends "the fix is a preload of the first slide's image". That was
+built, deployed and measured, and it fixed nothing. This entry corrects three
+things in it, records what does govern the score, and records a second defect
+that the corrective experiment itself concealed.
+
+### What the entry above got wrong
+
+**The mode table was not a measurement.** "Load delay 1.1–1.5s good, 2.3–2.4s
+bad" was read off Lighthouse's LCP phase breakdown. Under simulated throttling
+those four phases are the simulator's scaled estimates. The observed request for
+the hero starts at about 240ms in both modes. Worse for the theory: the slow runs
+are the ones whose real page load was FASTEST.
+
+**The preload, alone, moved nothing.** On its own deploy (`3515734`), five
+alternated rounds: production 79, 79, 79, 87, 88; preload 86, 93, 74, 85, 79. It
+stays in the branch because it is correct, costs nothing and is guarded by
+tests, but no part of the final result can honestly be attributed to it.
+
+**The layout shift on `div#Lofts` is not #46 and is no longer "not
+established".** It is the mobile aerial, `<img class="image-18">`, arriving into
+a box nobody reserved. Counted from the blocking runs below: 0.124–0.142 in 8 of
+the 11 runs where the aerial was allowed to load, 0.009 in the other 3 where it
+beat layout, and never above 0.009 in the 13 where it was blocked.
+
+### What governs the score
+
+Requests blocked by URL pattern against production's permalink, 24 runs:
+
+| Blocked                       | Scores         | Layout shift        |
+| ----------------------------- | -------------- | ------------------- |
+| nothing                       | 92, 79, 85, 89 | up to 0.142         |
+| slides 2–6                    | 93, 81, 87, 94 | up to 0.124         |
+| aerial only                   | 81, 92, 82     | 0.009               |
+| Contact photograph only       | 74, 73, 85     | 0.124–0.142         |
+| aerial + Contact photograph   | 82, 81, 93     | 0.009               |
+| slides 2–6 + aerial           | 97, 96, 98     | 0.009, 0.009, 0.000 |
+| slides 2–6 + everything below | 97, 97, 97, 97 | 0.009               |
+
+Neither group alone is enough; together they pin the score. The mechanism showed
+up once each run's requests were lined up against its OBSERVED paint: the score
+tracks the weight of the images that had already finished when the hero painted.
+In the last clean A/B production read 154, 189, 208, 349, 541, 770 KB finished
+before paint, scoring 92, 92, 88, 89, 78, 72. A fast real load finishes more of
+the page before the hero paints, and the simulator then charges all of it against
+the hero on its slow simulated link. That is why the fastest real loads scored
+worst, and why a CI runner with a good pipe reads 72. I have not read the
+simulator's source; this is what twelve runs show, not what the code says.
+
+### The change, and why each part is shaped the way it is
+
+Slides 2–6 carry `background-image: none` until load + idle, or until the
+visitor touches the slider, and autoplay skips any tick that lands before they
+are painted. It has to be `none` and not an omitted declaration: each slide class
+has a default photograph in the transcribed stylesheet, and omitting the inline
+style falls through to five unoptimised local JPEGs. That was caught by a unit
+test and a network assertion, not by looking. Without JS nothing is lost, because
+the strip cannot move without JS.
+
+The aerial gets an imgix ladder (480/768/1024/1440w, `sizes="100vw"`) and
+`width`/`height` from the authored dimensions, which needs `height: auto` at
+≤767px or the attribute would set its height outright. I wrote "identical
+geometry" before measuring it. Measured, the aerial is 0.23px shorter at 390 and
+0.28px at 767, because imgix rounds each rendition to whole pixels; `#Lofts`
+rises by the same amount. It is in `matching/LEDGER.md` as what it is.
+
+The load-then-idle schedule already existed inside `utils/preloadHidden.ts`. It
+was lifted into `utils/afterLoadIdle.ts` and both now use it; `preloadHidden`'s
+seven tests guarded the lift.
+
+### The first A/B said "better, not fixed", and the reason was my own experiment
+
+`d146bed` against production, six rounds: 99, 95, 89, 87, 90, 93 against 83, 74,
+79, 78, 85, 92. Better in every round but the last, layout shift gone, and not
+the flat 97 the blocking table promised.
+
+The blocking pattern was a URL match on `location-aerial`. That photograph has
+TWO consumers, and the pattern removed both. The second is `NavyLocationBand`:
+`div#Location` paints the aerial as a CSS background and is `display: none` at
+≤767px. Its authored url travelled as an inline `background-image`, and an
+inline declaration is resolved when the element is parsed, whether or not the
+stylesheet holding that `display: none` has arrived. On the `d146bed` deploy at
+phone width the band's 201KB original was downloaded in **13 of 20 loads**
+(and 5 of the 6 Lighthouse runs), resource timing `initiatorType: "css"`. In all
+13 the fetch started before the last stylesheet finished, for example at 174ms
+against a stylesheet ending at 250ms. In the 7 clean loads the stylesheet won.
+
+This has been true since launch and was invisible: the mobile `<img>` used the
+same URL, so the two shared one request and production shows a single 201KB
+aerial. Giving the `<img>` its own renditions is what split them. I had also
+seen its footprint and walked past it: the production check earlier today
+reported image requests before load as "9/10", flipping, and I recorded the flip
+instead of asking what the tenth request was.
+
+The url now travels as `--band-photo`, and the stylesheet paints
+`background-image: var(--band-photo)`, so the fetch cannot start before the
+stylesheet that also hides the band. That is how the reference behaves, its
+url() being in its stylesheet. `NavyFloorPlans` already carried its trigger
+images this way for an unrelated reason. After: 0 of 20 loads on the `071a205`
+deploy, and on the production build 0 of 8 in each of Chromium, Firefox and
+WebKit, with the desktop band still reading 1440×900, `cover`, `50% 50%` from
+the authored URL in all three.
+
+### The measurement that closed it
+
+Production's permalink against the `071a205` deploy, six alternated rounds,
+machine idle:
+
+| Arm         | Scores                 | Simulated LCP | Layout shift           |
+| ----------- | ---------------------- | ------------- | ---------------------- |
+| production  | 92, 92, 78, 88, 72, 89 | 2465–5984 ms  | 0.124–0.142 in 5 of 6  |
+| this branch | 95, 93, 96, 97, 95, 95 | 2643–3221 ms  | 0.009 in 5, 0.000 in 1 |
+
+Production reproduced the fleet's 72 in the same sitting. This branch never
+finished more than 205KB of images before the hero painted.
+
+### Defects in how the session worked, named
+
+A **stale `vite preview`** on port 4519 (PID 23634) served an old bundle to a
+production check: 404s, one slide of six painted. `pkill -f 'vite preview'` had
+been "cleaning up" all along and matching nothing, because the process is
+`node …/vite.js preview`. Kill by PID from `lsof -nP -t -iTCP:4519 -sTCP:LISTEN`,
+and look before trusting a port.
+
+A **vacuous smoke test, caught only by a second mutation.** The phone test first
+held `.css` responses back 400ms. The harness boots `vite dev`, which inlines the
+page's CSS into the document, so the race cannot be lost there and the test
+passed with the defect restored. The first mutation had turned all three new
+tests red, which looked like proof and was not: they all died on a shared
+precondition (`--band-photo` missing from the HTML) and the network assertion
+never ran. The mutation that mattered kept the custom property and put the
+inline background back beside it. **A mutation has to leave every precondition
+true and break only what the assertion claims to guard.** The test now serves
+the document with every stylesheet stripped, which is the moment production
+fetched in, and fails naming the exact URL.
+
+A **contaminated A/B.** The first comparison of `071a205` ran while I was using
+prettier, node and `gh` on the same machine: 88, 95, 87, 95, 96, the 88 and 87
+carrying 317 and 357ms of blocking time that no idle run has shown before or
+since, plus one `NO_NAVSTART` trace failure. It was rerun with the machine left
+alone, and that rerun is the table above.
+
+**Two wrong numbers in my own record.** The body of commit `d146bed` says the
+blocking experiment was 31 runs; the files say 24. The ledger said the shift
+appeared in "every run where the image loaded"; it was 8 of 11. The ledger was
+corrected before merge. The commit body cannot be, and the squash commit takes
+the PR description instead.
+
+### Not done
+
+The navbar logo (64KB for an image shown 164px wide, and named `fpo`) and the
+Contact photograph (304KB, one srcset candidate that is that panel's measured
+geometry) are heavier than they need to be and do not move the score: blocking
+the Contact photograph alone read 74, 73, 85. Filed as **#53**, behind #34.
+
+The Firefox/WebKit desktop failure from the CI browser audit is still
+unreproduced from here.
+
+The Maintenance email is still unsent. After this merges and production
+deploys, the next `fleet-lighthouse` sweep overwrites the row's 72. The
+2026-09-17 draft `rec67VEr1fwaZyNtv` froze its evidence at draft time
+(reddoor-maintenance#890), so it has to be discarded and re-drafted, and the
+discard is a production delete that is Tucker's to run. Approval of the email
+stays with Tucker.
