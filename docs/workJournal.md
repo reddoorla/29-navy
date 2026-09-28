@@ -2939,3 +2939,18 @@ tier went to `healthy`.
 
 The frozen P=91 on the draft stays; the re-check refreshes evidence, not
 scores. The live 93 reaches a client only through a new draft.
+
+### Applied, the same afternoon
+
+Tucker set the recipients, merged reddoor-maintenance#929 (`84e6d2e`), and
+pressed refresh. His first press, before the merge, ran the old code on `main`
+(run 36459597295). Its line had no `evidence=` field, and the draft still read
+"Not yet measured". The second press ran the merged code (run 36461035909),
+which logged `REPORT_RERENDER report=rec67VEr1fwaZyNtv status=rendered
+bytes=54317 header=turso evidence=reticked`.
+
+Read back from Turso afterwards, all five gating items were `pass`, stamped
+2026-09-27, and ticked. The approve blockers were `[]`. The cockpit's own
+`buildSiteAlarmContext` returned tier `healthy` with no items and no watch
+reasons, and setup read 4/4. The draft is still unapproved and unsent, which is
+right while reddoor-maintenance#928 stands.
