@@ -2895,3 +2895,62 @@ The email. The frozen draft `rec67VEr1fwaZyNtv` is untouched, verified by a dry
 run that passes every guard and stops before both deletes, having backed up 33
 Turso columns and 16 Airtable fields. The discard is a production delete in two
 stores and is Tucker's to run, as is approval of the email.
+
+## 2026-09-28 — The cockpit's warnings were one frozen draft and one blank field (reddoor-maintenance `e075aa9c`, #928)
+
+Tucker asked about "a bunch of warnings" on 29 Navy in the cockpit while
+finishing its move into the maintenance fleet. Nothing in this repo changed. I
+ran the cockpit's own alarm code (`buildSiteAlarmContext`, the function the
+`/s/29-navy` page calls) against the live Turso row, and it raised exactly one
+item: "Maintenance draft can't be approved — health-gate (+4 more)". The five
+are the gating checklist items on the 2026-09-17 draft `rec67VEr1fwaZyNtv`, each
+still reading "Not yet measured". The 2026-09-20 entry above predicted this:
+evidence froze when the draft was made, before the first sweep
+(reddoor-maintenance#890). The only other flag was the setup chip, 3/4, missing
+"Report recipients". `Report recipients (To)` is blank, and the send falls back
+to the point of contact, MatthewB@worthe.com, whom Tucker confirmed as the
+recipient.
+
+The site is clean by every measure the fleet takes: P93 A100 BP96 SEO100,
+deploy `ready`, functions and Prismic pass, certificate 80 days, 0
+critical/high vulns, smoke pass. CI on `main` is green, and `last commit 6d
+ago` is well inside the 30-day stale line.
+
+### What changed, and where
+
+The fix is in reddoor-maintenance, not here. The dashboard's "refresh preview"
+now re-checks an unsent, unapproved draft's evidence against current health
+before re-rendering. Run against this draft with its writes stubbed, all five
+items went to `pass`, the approve blockers went from 5 to 0, and the cockpit
+tier went to `healthy`.
+
+### What is left, and why it is Tucker's
+
+1. Set `Report recipients (To)` to `MatthewB@worthe.com` on the site-details
+   page. The session's permission layer refused that production write, so it
+   was not made.
+2. Once the reddoor-maintenance change is on `main`, press "refresh preview" on
+   the 29 Navy page. That clears the red item without deleting anything. It has
+   to happen within 3 days of a nightly sweep, which is the evidence window.
+3. **Do not approve the email yet.** Airtable is over its monthly API quota,
+   and the send path writes `Sent at` to Airtable before Turso for a `rec…`
+   report like this one. A hung stamp can end in a second copy of the email to
+   the client (reddoor-maintenance#928).
+
+The frozen P=91 on the draft stays; the re-check refreshes evidence, not
+scores. The live 93 reaches a client only through a new draft.
+
+### Applied, the same afternoon
+
+Tucker set the recipients, merged reddoor-maintenance#929 (`84e6d2e`), and
+pressed refresh. His first press, before the merge, ran the old code on `main`
+(run 36459597295). Its line had no `evidence=` field, and the draft still read
+"Not yet measured". The second press ran the merged code (run 36461035909),
+which logged `REPORT_RERENDER report=rec67VEr1fwaZyNtv status=rendered
+bytes=54317 header=turso evidence=reticked`.
+
+Read back from Turso afterwards, all five gating items were `pass`, stamped
+2026-09-27, and ticked. The approve blockers were `[]`. The cockpit's own
+`buildSiteAlarmContext` returned tier `healthy` with no items and no watch
+reasons, and setup read 4/4. The draft is still unapproved and unsent, which is
+right while reddoor-maintenance#928 stands.
