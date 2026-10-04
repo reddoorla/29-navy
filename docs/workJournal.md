@@ -3014,7 +3014,7 @@ Gates: `pnpm lint` clean; `pnpm check` 0 errors and 1 warning, the same as
 Prismic at `5d30655`, the base of this change, so nothing was owed to Prismic
 first.
 
-## 2026-10-04 — The simulator leaves the public pages' bundle; an encoded path gets the simulator's framing (`fix/simulator-chunk-and-encoded-framing`)
+## 2026-10-04 — The simulator leaves the public pages' bundle; an encoded path gets the simulator's framing (#61)
 
 Ported from reddoor-starter#168, following caltex-landing#70; the starter's entry records the four bundle fixes that failed before this one. #60 imported `SliceSimulator` from the `@prismicio/svelte` barrel, which statically re-exports it, so Rolldown put the simulator into the barrel's shared chunk and every page that renders a `SliceZone` loaded it. `scripts/prismic-barrel.ts` declares that re-export-only module side-effect-free, and `SliceZone` is then bound directly.
 
