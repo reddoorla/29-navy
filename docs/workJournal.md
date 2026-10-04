@@ -3013,3 +3013,15 @@ Gates: `pnpm lint` clean; `pnpm check` 0 errors and 1 warning, the same as
 `pnpm build` green. The nightly drift sweep read the 16 models as matching
 Prismic at `5d30655`, the base of this change, so nothing was owed to Prismic
 first.
+
+## 2026-10-04 — The simulator leaves the public pages' bundle; an encoded path gets the simulator's framing (`fix/simulator-chunk-and-encoded-framing`)
+
+Ported from reddoor-starter#168, following caltex-landing#70; the starter's entry records the four bundle fixes that failed before this one. #60 imported `SliceSimulator` from the `@prismicio/svelte` barrel, which statically re-exports it, so Rolldown put the simulator into the barrel's shared chunk and every page that renders a `SliceZone` loaded it. `scripts/prismic-barrel.ts` declares that re-export-only module side-effect-free, and `SliceZone` is then bound directly.
+
+Measured from the build manifest as each client node's static-import closure, gzipped, `main` → branch: home and `[uid]` 48,226 → 43,951, `/dev/match/[uid]` 48,221 → 43,946, `/dev/a11y-fixtures` 55,847 → 51,054. Each of them reached the simulator chunk before and none does after. `/slice-simulator` went 48,302 → 48,581 and now carries the code in its own node. The root layout never reached it (45,010 → 45,006).
+
+The hook asked `isCmsFramedRoute(event.url.pathname)`, the raw path, while SvelteKit routes on the decoded one. From `vite preview` of `main`, `/slice%2Dsimulator` and `/slice%2dsimulator` rendered the simulator with `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, so Prismic could not frame it there. That failed closed, but it was the wrong route test. The hook now asks `event.route.id`, and both encoded paths answer like `/slice-simulator`: no X-Frame-Options and the widened `frame-ancestors`.
+
+The starter imports the plugin as `./scripts/prismic-barrel.ts`. Here that failed `pnpm check` ("An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled"), because this tsconfig does not set the flag the starter does. The import is extensionless instead, and the tsconfig is unchanged. The build-manifest check is `scripts/prismic-barrel.test.ts`, which vitest's `include` covers. The HTTP check is `tests/smoke/slice-simulator.spec.ts`. Its control is `/`, because `/privacy` is a 404 here. That works because the smoke suite runs `vite dev`, where `/` goes through the hook; under `vite preview`, `/` is prerendered and has no headers.
+
+Against a `main` build, the ported tests failed 4 of 20 in vitest (the bundle check, the encoded path, the null route and the exact match) and 2 of 4 in the smoke spec (both encoded paths). On the branch, all of them pass. With the plugin removed and the site rebuilt, the bundle check fails. With the hook back on the pathname, two of the hook tests fail. The `respond` helper in the older hook tests now passes a route id too, because the hook reads `event.route.id` on every request.
