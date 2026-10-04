@@ -1,0 +1,5 @@
+{
+  "repositoryName": "29-navy",
+  "libraries": ["./src/lib/slices"],
+  "routes": []
+}

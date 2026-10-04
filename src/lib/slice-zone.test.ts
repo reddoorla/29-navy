@@ -21,7 +21,7 @@ const modelIds = async () => {
 };
 
 // A slice can be fully built — model, mocks, component, registered in
-// src/lib/slices/index.js, rendering correctly on /dev/match/home — and still
+// src/lib/slices/index.ts, rendering correctly on /dev/match/home — and still
 // be absent from the custom type that is supposed to hold it. Prismic then
 // accepts the seed with HTTP 200 and publishes a document with NO slices.
 //

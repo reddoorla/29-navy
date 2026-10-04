@@ -339,7 +339,7 @@ async function main() {
   const verifyOnly = process.argv.includes("--verify");
   const repositoryName =
     process.env.PRISMIC_REPOSITORY_NAME ||
-    JSON.parse(readFileSync(resolve(ROOT, "slicemachine.config.json"), "utf8")).repositoryName;
+    JSON.parse(readFileSync(resolve(ROOT, "prismic.config.json"), "utf8")).repositoryName;
 
   const client = prismic.createClient(repositoryName, { fetch });
 

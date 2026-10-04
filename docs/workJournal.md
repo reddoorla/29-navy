@@ -2954,3 +2954,62 @@ Read back from Turso afterwards, all five gating items were `pass`, stamped
 `buildSiteAlarmContext` returned tier `healthy` with no items and no watch
 reasons, and setup read 4/4. The draft is still unapproved and unsent, which is
 right while reddoor-maintenance#928 stands.
+
+## 2026-10-04 — Off Slice Machine, onto the Prismic CLI (reddoor-maintenance#1090, `claude/prismic-cli`)
+
+Phase 4 of the fleet migration (reddoor-maintenance
+`docs/prismic-migration-plan-2026-10.md` §9), ported from reddoor-starter#166
+and espada#79. Slice Machine is deprecated by Prismic since 2026-09-18; models
+are now edited in the Type Builder, and the generated files come from
+`pnpm prismic:gen`.
+
+**The committed types were five slices and one custom type behind.** The old
+`src/prismicio-types.d.ts` exported 34 names; the regenerated
+`prismicio-types.d.ts` exports 55. All 21 new names belong to the five
+`navy_*` slices (NavyContact, NavyFloorPlans, NavyHeroSlider, NavyLocationBand,
+NavyResidentLinks) and `FormRepliesDocument`. `customtypes/page` already listed
+the five slices in its slice zone, and `src/lib/slices/index.js` already
+registered them, so only the types file was stale. Nothing was built on the
+missing types: each navy slice declares a hand-written mirror of its
+model.json, with a comment saying the generated type supersedes it once the
+file is regenerated. That condition holds now. The mirrors are untouched
+(only their comments were corrected), and swapping them for `Content.*` is
+follow-up work, not part of this change. The slice index's component map was
+identical, 14 entries before and after. Neither `gen` command touched a
+`mocks.json`.
+
+**Framing was blocked three ways, and the live site proves the one that
+mattered.** `kit.csp` sets `frame-ancestors 'self'`, the hook sets
+`X-Frame-Options: SAMEORIGIN` on every response, and `netlify.toml` sets the
+same header on `/*`. `/slice-simulator` inherited the root layout's
+`prerender = "auto"` and was built to a static `slice-simulator.html`, so in
+production it is served from the CDN with netlify.toml's header and a `<meta>`
+CSP that cannot carry frame-ancestors. Measured read-only on 29navy.com:
+`/slice-simulator`, `/` and `/health` all answer `x-frame-options: SAMEORIGIN`.
+`vite preview` of `main` showed neither header on `/slice-simulator` or `/`,
+because it does not apply netlify.toml. It is the wrong instrument for this
+question.
+
+The route is now `prerender = false`, and the hook (starter's
+`cms-framing.ts`) deletes X-Frame-Options and widens frame-ancestors on that
+route only. From `vite preview` of the branch, `/slice-simulator` answers no
+X-Frame-Options and exactly one
+`frame-ancestors 'self' http://localhost:* https://*.prismic.io https://prismic.io`.
+`/health` keeps SAMEORIGIN, `/` is still prerendered with no headers, and a 404
+keeps SAMEORIGIN plus `frame-ancestors 'self'`. One thing is unmeasured:
+whether Netlify adds netlify.toml's `/*` header to a function response. The
+starter found it does not. The deploy preview is the first place to check.
+
+**Mutations.** The five new hook tests went red when X-Frame-Options was kept
+on the route (2 failed), when the CSP was not widened (1), when the
+trailing-slash normalisation was dropped (1), and when the old frame-ancestors
+was not filtered out (1). Editing the `CMS_FRAME_ANCESTORS` literal left them
+green, because the tests assert against the constant. Only the preview
+measurement pins the value. The codegen gate printed GREEN on the committed
+tree and RED with a field added to NavyLocationBand's model.json.
+
+Gates: `pnpm lint` clean; `pnpm check` 0 errors and 1 warning, the same as
+`main`; unit tests 577 passed against 572 on `main` (the 5 new framing tests);
+`pnpm build` green. The nightly drift sweep read the 16 models as matching
+Prismic at `5d30655`, the base of this change, so nothing was owed to Prismic
+first.
