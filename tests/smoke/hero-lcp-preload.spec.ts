@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 // Playwright runs this file as native ESM in Node, where JSON imports require
 // the explicit attribute (see tests/smoke/routes.ts).
-import slicemachineConfig from "../../slicemachine.config.json" with { type: "json" };
+import prismicConfig from "../../prismic.config.json" with { type: "json" };
 
 // The first hero slide is the homepage's LCP element, and it paints as a CSS
 // background — invisible to the preload scanner. This block guards the
@@ -23,7 +23,7 @@ import slicemachineConfig from "../../slicemachine.config.json" with { type: "js
 
 // A fresh clone has no CMS, "/" 404s by design (tests/smoke/routes.ts), and the
 // slides paint stylesheet defaults with no authored URL to preload.
-const isPlaceholderRepo = slicemachineConfig.repositoryName === "your-prismic-repo-name";
+const isPlaceholderRepo = prismicConfig.repositoryName === "your-prismic-repo-name";
 
 const decodeHtml = (s: string) =>
   s

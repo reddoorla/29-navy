@@ -4,9 +4,9 @@
   import { srcset as prismicSrcset } from "$lib/utils/image";
   import { preloadHidden } from "$utils/preloadHidden";
 
-  // Mirrors model.json. Slice Machine's generated `Content.NavyFloorPlansSlice`
-  // supersedes this once the slice is registered and src/prismicio-types.d.ts is
-  // regenerated — that file is generated, so this component does not reach into it.
+  // Mirrors model.json. The generated `Content.NavyFloorPlansSlice` now exists in
+  // prismicio-types.d.ts (written by `pnpm prismic:gen`) and could supersede this;
+  // that file is generated, so this component does not reach into it.
   type Floor = {
     label: KeyTextField;
     trigger_image: ImageField;

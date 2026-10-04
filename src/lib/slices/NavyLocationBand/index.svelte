@@ -2,9 +2,9 @@
   import { PrismicText } from "@prismicio/svelte";
   import { isFilled, type ImageField, type RichTextField } from "@prismicio/client";
 
-  // Mirrors model.json. Slice Machine's generated `Content.NavyLocationBandSlice`
-  // supersedes this once the slice is registered and src/prismicio-types.d.ts is
-  // regenerated — that file is generated, so this component does not reach into it.
+  // Mirrors model.json. The generated `Content.NavyLocationBandSlice` now exists in
+  // prismicio-types.d.ts (written by `pnpm prismic:gen`) and could supersede this;
+  // that file is generated, so this component does not reach into it.
   type NavyLocationBandSlice = {
     slice_type: string;
     variation: string;
