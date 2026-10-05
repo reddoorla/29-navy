@@ -3050,3 +3050,25 @@ The five Navy slices' unit tests regexed every size, colour, padding, breakpoint
 - #70: nothing guards the hero logo's `width="143"`.
 
 #71, the dead `.prettierignore` entry, is fixed here.
+
+## 2026-10-05 — The freeze round: designer edits stay green, real bugs go red, and the resident tile's hover contrast is measured (#72)
+
+The tiers entry above claimed the gate no longer freezes design. This entry is that claim tested. Each edit below was made to the site source, run through the whole gate (vitest and the `@smoke` tier), and then reverted.
+
+**Designer edits.** Four were applied together:
+
+- the Residents heading moved from 32px to 36px;
+- the penthouse hover veil changed from #ffffff7d to #ffffff66 (the dark ink stays about 7.6:1);
+- the hero `DELAY_MS` changed from 5000 to 6000;
+- the location band moved from 100vh to 80vh.
+
+On main they turned 9 unit tests red: HeroSlider 5, ResidentLinks 1, LocationBand 1, FloorPlans 2. On this branch the gate stayed green: vitest 522, `@smoke` 15/15.
+
+**Real bugs.**
+
+- Disabling the electric popup's focus trap went red in vitest (focus moved in, Tab containment) and in `@smoke` (the resident popups at 1440 and 390).
+- Pointing the nav "Location" link at `/#location` went red in LocationBand's id check.
+
+**A belief corrected.** Deleting `restore?.focus()` from the resident popup is not a bug. `trapFocus` already returns focus to the trigger on close, so the gate is right to stay green there.
+
+**A gap closed.** A resident tile's hover going to #f2b8b0 under its white label is about 1.7:1. On main that was caught only by accident, through a `#aa4133` literal pin that the tiers PR removed, and `home.spec` hovers only the floor tabs. `NavyResidentLinks.test.ts` now composites the label ink over the tile, at rest and on hover, on the section's ground. It takes the threshold from the smallest declared label size: the label is 32px at every breakpoint and not bold, so it is large text and needs 3:1, and it would need 4.5:1 if any breakpoint dropped below 24px. Today the hover measures about 6:1. The bad hover goes red at 1.71.

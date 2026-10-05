@@ -534,3 +534,95 @@ describe("NavyResidentLinks slice", () => {
     ).toHaveLength(6);
   });
 });
+
+// jsdom applies no stylesheet, so the tile's label contrast is computed from
+// the declarations in the component's own <style>, at rest and hovered, the
+// way NavyFloorPlans does for its text trigger. Whatever colours a designer
+// picks, the white label has to stay readable on the tile that carries it.
+describe("NavyResidentLinks tile contrast", () => {
+  const SOURCE = read("index.svelte");
+  /** The style block with comments stripped (they quote selectors verbatim). */
+  const CSS = SOURCE.slice(SOURCE.indexOf("<style>"), SOURCE.indexOf("</style>")).replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  /** Every rule body for an exact selector, @media restatements included. */
+  const ruleBodies = (selector: string) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return [...CSS.matchAll(new RegExp(`(?:^|[}\\s])${escaped}\\s*\\{([^}]*)\\}`, "g"))].map(
+      (m) => m[1],
+    );
+  };
+  const declared = (selector: string, property: string) =>
+    ruleBodies(selector)
+      .map((body) => new RegExp(`(?:^|[\\s;])${property}:\\s*([^;]+);`).exec(body)?.[1].trim())
+      .filter((v): v is string => v !== undefined);
+
+  /** A declared colour as [r, g, b, alpha]. Anything unrecognised throws, so a
+   *  colour this cannot read is never silently skipped. */
+  const rgba = (value: string): number[] => {
+    const v = value.toLowerCase();
+    const keyword: Record<string, string> = { white: "#fff", black: "#000", transparent: "#0000" };
+    const hex = /^#([0-9a-f]+)$/.exec(keyword[v] ?? v)?.[1] ?? "";
+    if ([3, 4, 6, 8].includes(hex.length)) {
+      const pairs = (hex.length <= 4 ? hex.replace(/./g, "$&$&") : hex).match(/../g)!;
+      const [r, g, b, a = 255] = pairs.map((p) => parseInt(p, 16));
+      return [r, g, b, a / 255];
+    }
+    const fn =
+      /^rgba?\(([^)]*)\)$/
+        .exec(v)?.[1]
+        .split(/[\s,/]+/)
+        .map(Number) ?? [];
+    if (fn.length >= 3) return [fn[0], fn[1], fn[2], fn[3] ?? 1];
+    throw new Error(`cannot measure the colour \`${value}\``);
+  };
+  const over = ([r, g, b, a]: number[], ground: number[]) =>
+    [r, g, b].map((c, i) => a * c + (1 - a) * ground[i]);
+  const contrast = (x: number[], y: number[]) => {
+    const L = (rgb: number[]) => {
+      const [r, g, b] = rgb.map((c) => {
+        const s = c / 255;
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const [hi, lo] = [L(x), L(y)].sort((m, n) => n - m);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it("keeps the tile label at AA on the tile, at rest and hovered", () => {
+    const [section] = declared(".section-5", "background-color");
+    const [rest] = declared(".div-block-9", "background-color");
+    const [hover] = declared(".div-block-9:hover", "background-color");
+    const [ink] = declared(".text-block-8", "color");
+    expect(section, "the section's ground is unmeasured").toBeTruthy();
+    expect(rest, "the tile's ground is unmeasured").toBeTruthy();
+    expect(hover, "the hovered tile's ground is unmeasured").toBeTruthy();
+    expect(ink, "the label's ink is unmeasured").toBeTruthy();
+
+    // WCAG 1.4.3: large text (>= 24px, or >= 18.66px bold) needs 3:1, anything
+    // smaller 4.5:1. Judged on the SMALLEST size any breakpoint declares.
+    const sizes = declared(".text-block-8", "font-size").map((s) => {
+      const px = /^([\d.]+)px$/.exec(s)?.[1];
+      if (!px) throw new Error(`cannot read the label's font-size \`${s}\``);
+      return Number(px);
+    });
+    expect(sizes.length, "the label's size is unmeasured").toBeGreaterThan(0);
+    const bold = declared(".text-block-8", "font-weight").some(
+      (w) => w === "bold" || Number(w) >= 700,
+    );
+    const smallest = Math.min(...sizes);
+    const need = smallest >= 24 || (bold && smallest >= 18.66) ? 3 : 4.5;
+
+    const page = over(rgba(section!), [255, 255, 255]);
+    for (const [state, fill] of [
+      ["at rest", rest!],
+      ["hovered", hover!],
+    ] as const) {
+      const ground = over(rgba(fill), page);
+      const label = over(rgba(ink!), ground);
+      expect(contrast(label, ground), `the label ${state}`).toBeGreaterThanOrEqual(need);
+    }
+  });
+});
