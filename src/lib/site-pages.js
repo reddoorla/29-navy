@@ -34,7 +34,7 @@ export const lang = "en-us";
  * the hero's mobile band and the location band — and mocks.json had authored two
  * slightly different strings for it; the more specific one won. `documents()`
  * emitting one URL with two alt strings is a mistake Prismic silently resolves
- * in favour of whichever came first, so site-pages.test.ts fails on it instead.
+ * in favour of whichever came first, so site-pages-images.test.ts fails on it instead.
  *
  * @param {(url: string, alt: string) => unknown} img resolves an image to
  *   whatever the caller needs — a migration asset for the seed, a `{url, alt}`

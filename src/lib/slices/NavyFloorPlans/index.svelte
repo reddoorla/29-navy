@@ -445,8 +445,9 @@
        gate measures. Only the ink moves, and it moves to a value the reference
        itself specifies for hover ink in this same component (ref css:3055,
        `._3:hover`), rather than to one invented here. White 2.30:1 → #050101
-       9.04:1. Asserted in NavyFloorPlans.test.ts and audited, in the hover
-       state, by tests/a11y/home.spec.ts. */
+       9.04:1. That the hovered label clears 4.5:1 is asserted in
+       NavyFloorPlans.test.ts and audited, in the hover state, by
+       tests/a11y/home.spec.ts. */
     color: #050101; /* repo a11y: ref css:3055's own hover ink — see above */
   }
 

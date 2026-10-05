@@ -29,13 +29,23 @@ describe("MediaText slice", () => {
     expect(getByRole("img").getAttribute("alt")).toBe("Pool");
   });
 
-  it("reverses the image/copy order for imageLeft", () => {
-    const { container } = render(MediaText, {
-      props: { slice: makeSlice("imageLeft") },
-    });
-    // the editorial split reverses via grid order: the media column moves ahead
-    // of the copy column on large screens
-    const media = container.querySelector(".mt-media");
-    expect(media?.className).toContain("lg:order-1");
+  it("puts the image first for imageLeft and second for imageRight", () => {
+    const order = (el: Element) => {
+      const t = /(?:^|\s)lg:order-(first|last|\d+)(?=\s|$)/.exec(el.className)?.[1];
+      return t === "first" ? -Infinity : t === "last" ? Infinity : Number(t ?? 0);
+    };
+    const imageLeads = (variation: "imageRight" | "imageLeft") => {
+      const { container, unmount } = render(MediaText, { props: { slice: makeSlice(variation) } });
+      const media = container.querySelector(".mt-media")!;
+      const copy = container.querySelector(".mt-copy")!;
+      const leads =
+        order(media) < order(copy) ||
+        (order(media) === order(copy) &&
+          !!(media.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING));
+      unmount();
+      return leads;
+    };
+    expect(imageLeads("imageLeft")).toBe(true);
+    expect(imageLeads("imageRight")).toBe(false);
   });
 });

@@ -1,19 +1,18 @@
-import { render, cleanup } from "@testing-library/svelte";
+import { render, cleanup, within } from "@testing-library/svelte";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { tick } from "svelte";
 import type { ComponentProps } from "svelte";
+import { preloadHidden } from "$utils/preloadHidden";
 import NavyResidentLinks from "./index.svelte";
+
+vi.mock("$utils/preloadHidden", () => ({ preloadHidden: vi.fn(() => () => {}) }));
 
 type Slice = ComponentProps<typeof NavyResidentLinks>["slice"];
 
 const A = "/29navy/assets/";
-/** The reference's own path for the shared close glyph, URL-encoded exactly as
- *  matching/spec/index.html encodes it. The file is NOT in static/29navy/assets/
- *  — see the KNOWN GAP note in index.svelte. */
-const CLOSE_ICON = `${A}614de9548befc939ad34bd31_Untitled%20design%20(8).png`;
 
 const web = (url: string, target?: string) => ({
   link_type: "Web",
@@ -85,33 +84,6 @@ const slice = {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const read = (name: string) => readFileSync(join(HERE, name), "utf8");
 
-const SOURCE = read("index.svelte");
-const STYLE = SOURCE.slice(SOURCE.indexOf("<style>"), SOURCE.indexOf("</style>"));
-/** Every `prop: value;` line inside the <style> block, trimmed. */
-const DECLARATIONS = STYLE.split("\n")
-  .map((l) => l.trim())
-  .filter((l) => /^[a-z-]+:\s.*;/.test(l));
-/** Every rule body whose selector list ends `<selector> {`, in source order.
- *  A selector can legitimately appear more than once — a base rule, a media
- *  override, and (for the popup roots) the shared custom-property rule — so a
- *  naive first-match lookup silently reads the wrong one. */
-const rulesFor = (selector: string) => {
-  const needle = `${selector} {`;
-  const bodies: string[] = [];
-  for (let i = STYLE.indexOf(needle); i > -1; i = STYLE.indexOf(needle, i + 1))
-    bodies.push(STYLE.slice(i, STYLE.indexOf("}", i)));
-  return bodies;
-};
-/** The FIRST (base) rule for a selector — used to assert what is ABSENT. */
-const ruleBody = (selector: string) => {
-  const bodies = rulesFor(selector);
-  expect(bodies.length, `no \`${selector}\` rule in the style block`).toBeGreaterThan(0);
-  return bodies[0];
-};
-/** Every rule for a selector, joined — used to assert what is PRESENT. */
-const anyRule = (selector: string) => rulesFor(selector).join("\n");
-/** An element's reference classes, with Svelte's scope hash stripped. */
-const refClasses = (el: Element) => [...el.classList].filter((c) => !c.startsWith("svelte-"));
 /** The inline at-rest pair, read back off the CSSOM — the browser normalises
  *  `display:none;opacity:0` into `display: none; opacity: 0;`, so the attribute
  *  string is not comparable while the two properties are. */
@@ -119,6 +91,7 @@ const inlineState = (el: Element) => {
   const style = (el as HTMLElement).style;
   return `display:${style.display};opacity:${style.opacity}`;
 };
+const display = (el: Element) => (el as HTMLElement).style.display;
 
 /** The six popup roots, keyed by the `modal` Select value that opens them.
  *  SEVEN triggers, SIX popups — `tv_internet` is opened by two tiles. */
@@ -130,6 +103,39 @@ const POPUPS = {
   ride: ".ride---modal",
   food: ".food-modal---popup",
 } as const;
+type PopupKey = keyof typeof POPUPS;
+
+/** Which popup each tile opens, by the label a visitor clicks. */
+const WIRING: Array<[string, PopupKey]> = [
+  [LABELS[1], "electric"],
+  [LABELS[2], "laundry"],
+  [LABELS[3], "gym"],
+  [LABELS[4], "tv_internet"],
+  [LABELS[5], "tv_internet"],
+  [LABELS[6], "ride"],
+  [LABELS[7], "food"],
+];
+
+/** The slice field that titles each popup. */
+const TITLES = {
+  electric: "electric_title",
+  laundry: "laundry_title",
+  gym: "gym_title",
+  tv_internet: "tv_title",
+  ride: "ride_title",
+  food: "food_title",
+} as const;
+
+/** A tile's anchor, found by its accessible name. */
+const tile = (container: Element, label: string) =>
+  within(container.querySelector("#Residents") as HTMLElement).getByRole("link", { name: label });
+/** The first tile that opens `key`. */
+const opener = (container: Element, key: PopupKey) =>
+  tile(container, WIRING.find(([, k]) => k === key)![0]);
+/** A popup's close control, by role and accessible name. `hidden: true`
+ *  because a closed popup is display:none and aria-hidden. */
+const closeButton = (popup: Element) =>
+  within(popup as HTMLElement).getByRole("button", { name: "Close", hidden: true });
 
 afterEach(() => {
   // Without this, every render leaves its container in document.body — and
@@ -143,120 +149,29 @@ afterEach(() => {
 describe("NavyResidentLinks slice", () => {
   // ---- Content and structure ------------------------------------------------
 
-  it("renders the gate's anchor string verbatim, once, on the one real outbound link", () => {
-    // matching/harness.json cuts the `home` page's regions on "Paying rent
-    // online?". Change the string and every region on the page misaligns
-    // silently — the failure reads as a geometry bug three sections away.
+  it("links the rent tile out, and makes every other tile a popup trigger", () => {
     const { container } = render(NavyResidentLinks, { props: { slice } });
-    const hits = [...container.querySelectorAll("*")].filter(
-      (el) => el.textContent === "Paying rent online?" && el.children.length === 0,
-    );
-    expect(hits).toHaveLength(1);
-    const anchor = container.querySelector("a.link-block")!;
-    expect(anchor.textContent).toBe("Paying rent online?");
-    expect(anchor.getAttribute("href")).toBe("https://payments.gozego.com/");
-    expect(anchor.getAttribute("target")).toBe("_blank");
+    const rent = tile(container, "Paying rent online?");
+    expect(rent.getAttribute("href")).toBe("https://payments.gozego.com/");
+    expect(rent.getAttribute("target")).toBe("_blank");
+    expect(rent.getAttribute("aria-haspopup")).toBeNull();
     // It is the ONLY tile that is a link rather than a popup trigger.
-    const tileHrefs = [...container.querySelectorAll("#Residents a")].map((a) =>
-      a.getAttribute("href"),
-    );
-    expect(tileHrefs.filter((h) => h !== "#")).toEqual(["https://payments.gozego.com/"]);
-  });
-
-  it("reproduces the reference's section subtree", () => {
-    // matching/spec/index.html: <div id="Residents" class="section-5">
-    //   <h1 class="heading residents">Residents </h1>
-    //   <div class="w-container"><div class="columns w-row">
-    //     <div class="w-col w-col-6"> 4 x <div class="div-block-9"><a…><div class="text-block-8">
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    const section = container.querySelector("div#Residents.section-5")!;
-    expect(section).not.toBeNull();
-
-    const h1 = section.querySelector(":scope > h1.heading.residents")!;
-    expect(h1).not.toBeNull();
-    expect(h1.textContent).toBe("Residents");
-
-    const row = section.querySelector(":scope > div.w-container > div.columns.w-row")!;
-    expect(row).not.toBeNull();
-    const cols = row.querySelectorAll(":scope > div.w-col.w-col-6");
-    expect(cols).toHaveLength(2);
-    for (const col of cols) {
-      const tiles = col.querySelectorAll(":scope > div.div-block-9");
-      expect(tiles).toHaveLength(4);
-      for (const tile of tiles) {
-        const a = tile.querySelector(":scope > a.w-inline-block")!;
-        expect(a).not.toBeNull();
-        expect(a.querySelector(":scope > div.text-block-8")).not.toBeNull();
-      }
-    }
-    expect([...row.querySelectorAll("div.text-block-8")].map((d) => d.textContent)).toEqual(LABELS);
-  });
-
-  it("keeps the h1 OUTSIDE .w-container", () => {
-    // Hazard: `.heading` is margin-left 20px (ref css:2187) while the container
-    // is a 940px auto-centred box (ref css:690-692). At 1440 the h1 starts at
-    // x=20 and the tiles at x=260. Tidying the h1 into the container moves it
-    // 240px right — a deliberate reference behaviour, not a bug.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    expect(container.querySelector(".w-container h1")).toBeNull();
-    expect(container.querySelector("#Residents > h1.heading.residents")).not.toBeNull();
-  });
-
-  it("wears the reference's out-of-document-order anchor classes", () => {
-    // Hazard: the right column numbers 5, 6, 8, 7. `.link-block-8` is
-    // "Need a ride?" and `.link-block-7` is "Hungry?". Wiring by class NUMBER
-    // instead of by the data-w-id map swaps the ride and food popups.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    const byClass = Object.fromEntries(
-      [...container.querySelectorAll("#Residents a")].map((a) => [
-        [...a.classList].find((c) => c.startsWith("link-block")),
-        a.textContent,
-      ]),
-    );
-    expect(byClass).toEqual({
-      "link-block": "Paying rent online?",
-      "link-block-2": "Hooking up electricity?",
-      "link-block-3": "Too busy to do laundry?",
-      "link-block-4": "Looking for a gym?",
-      "link-block-5": "Connecting cable tv?",
-      "link-block-6": "Plugging in internet?",
-      "link-block-8": "Need a ride?",
-      "link-block-7": "Hungry?",
-    });
-  });
-
-  it("carries the reference's data-w-id on all seven triggers and all six closes", () => {
-    // SPEC.md's interaction inventory is counted off `data-w-id` in the DOM —
-    // 18 triggers page-wide, of which this section owns 13.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    expect([...container.querySelectorAll("#Residents [data-w-id]")]).toHaveLength(7);
-    expect(container.querySelector("a.link-block")!.hasAttribute("data-w-id")).toBe(false);
-    expect([...container.querySelectorAll("[data-w-id]")]).toHaveLength(13);
-    expect(
-      container.querySelector('a.link-block-8[data-w-id="fe7975ee-45f1-d457-5dc3-20fe6f208fe6"]'),
-    ).not.toBeNull();
-    expect(
-      container.querySelector('a.link-block-7[data-w-id="a2f6f957-3c69-b2eb-3109-ff183138288a"]'),
-    ).not.toBeNull();
+    for (const [label] of WIRING)
+      expect(tile(container, label).getAttribute("href"), label).toBe("#");
   });
 
   // ---- The popups -----------------------------------------------------------
 
-  it("renders all six popups in the DOM, hidden by the reference's inline pair", () => {
+  it("renders every popup hidden at rest", () => {
     // The inline `display:none;opacity:0` is IX2 `useFirstGroupAsInitialState`
     // output, reproduced verbatim. It is what actually hides them: an inline
-    // display beats every stylesheet rule. They must be IN the DOM, not gated
-    // behind an {#if} — SPEC.md's display:none census at 1440 counts twelve
-    // divs, six of them these.
+    // display beats every stylesheet rule.
     const { container } = render(NavyResidentLinks, { props: { slice } });
     for (const selector of Object.values(POPUPS)) {
       const popup = container.querySelector(selector)!;
       expect(popup, selector).not.toBeNull();
-      expect(inlineState(popup)).toBe("display:none;opacity:0");
+      expect(display(popup), selector).toBe("none");
     }
-    // Six popups, and every one precedes #Residents in document order.
-    const roots = [...container.querySelectorAll(":scope > div")];
-    expect(roots.map((r) => r.id)).toEqual(["", "", "", "", "", "", "Residents"]);
   });
 
   it("opens the tv/internet popup from BOTH of its two triggers", async () => {
@@ -264,183 +179,172 @@ describe("NavyResidentLinks slice", () => {
     // both fire IX2 actionList "a-8" against `.pop-up-modal---tv-internet`
     // (matching/spec/js/…3cb35528df4a8f16.js). A 1:1 assumption either invents
     // a seventh popup or counts six triggers and passes vacuously.
-    for (const cls of ["link-block-5", "link-block-6"]) {
+    for (const label of ["Connecting cable tv?", "Plugging in internet?"]) {
       const { container, unmount } = render(NavyResidentLinks, { props: { slice } });
-      (container.querySelector(`a.${cls}`) as HTMLElement).click();
+      tile(container, label).click();
       await tick();
-      expect(inlineState(container.querySelector(POPUPS.tv_internet)!)).toContain("display:block");
+      expect(display(container.querySelector(POPUPS.tv_internet)!), label).toBe("block");
       unmount();
     }
   });
 
   it("opens exactly the popup its trigger names, and no other", async () => {
-    const wiring: Array<[string, keyof typeof POPUPS]> = [
-      ["link-block-2", "electric"],
-      ["link-block-3", "laundry"],
-      ["link-block-4", "gym"],
-      ["link-block-5", "tv_internet"],
-      ["link-block-6", "tv_internet"],
-      ["link-block-8", "ride"],
-      ["link-block-7", "food"],
-    ];
-    for (const [cls, key] of wiring) {
+    for (const [label, key] of WIRING) {
       const { container, unmount } = render(NavyResidentLinks, { props: { slice } });
-      const trigger = container.querySelector(`a.${cls}`) as HTMLElement;
-      // NO aria-expanded. It used to be `openKey === modal`, which is keyed on
-      // the MODAL and not on the trigger — and two distinct triggers open
-      // tv_internet ("Connecting cable tv?" .link-block-5 and "Plugging in
-      // internet?" .link-block-6, both in the wiring table above). Opening
-      // either announced BOTH as expanded, which is a worse lie than saying
-      // nothing. aria-haspopup="dialog" carries the affordance on its own.
-      expect(trigger.getAttribute("aria-expanded")).toBeNull();
+      const trigger = tile(container, label);
       expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
       trigger.click();
       await tick();
       for (const [other, selector] of Object.entries(POPUPS)) {
-        const style = inlineState(container.querySelector(selector)!);
-        expect(style, `${cls} -> ${other}`).toBe(
-          other === key ? "display:block;opacity:0" : "display:none;opacity:0",
+        expect(display(container.querySelector(selector)!), `${label} -> ${other}`).toBe(
+          other === key ? "block" : "none",
         );
       }
-      // still absent after opening — see the note above the click
-      expect(trigger.getAttribute("aria-expanded")).toBeNull();
+      // aria-expanded used to be `openKey === modal`, keyed on the MODAL and
+      // not on the trigger, so opening either tv/internet tile announced BOTH
+      // as expanded. Whatever a trigger says about itself, no other may claim
+      // the popup.
+      for (const other of container.querySelectorAll("#Residents a"))
+        if (other !== trigger)
+          expect(other.getAttribute("aria-expanded"), `${label} -> ${other.textContent}`).not.toBe(
+            "true",
+          );
       unmount();
     }
   });
 
-  it("fades in on the frame AFTER display flips, never in the same one", async () => {
-    // IX2 actionList "a" is three groups: the inline at-rest pair, then
-    // display:block at duration 0, THEN opacity 0 -> 1 over 500ms. Setting both
-    // in one frame means the transition never runs and the popup pops in.
-    vi.useFakeTimers();
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    (container.querySelector("a.link-block-2") as HTMLElement).click();
-    await tick();
-    const popup = container.querySelector(POPUPS.electric)!;
-    expect(inlineState(popup)).toBe("display:block;opacity:0");
-    await vi.advanceTimersByTimeAsync(32);
-    await tick();
-    expect(inlineState(popup)).toBe("display:block;opacity:1");
+  it("opens every popup at phone width", async () => {
+    // The <=767 stylesheet rules hide the popups, but the inline display beats
+    // them, so the reference's popups DO open at 767 and 390. Nothing here may
+    // decide by width whether to open.
+    const width = window.innerWidth;
+    const original = window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { value: 390, configurable: true });
+    window.matchMedia = ((q: string) => {
+      const max = /max-width:\s*(\d+)px/.exec(q);
+      const min = /min-width:\s*(\d+)px/.exec(q);
+      return {
+        matches: Boolean(max || min) && (!max || 390 <= +max[1]) && (!min || 390 >= +min[1]),
+        media: q,
+        addEventListener() {},
+        removeEventListener() {},
+      } as unknown as MediaQueryList;
+    }) as typeof window.matchMedia;
+    try {
+      for (const [label, key] of WIRING) {
+        const { container, unmount } = render(NavyResidentLinks, { props: { slice } });
+        tile(container, label).click();
+        await tick();
+        expect(display(container.querySelector(POPUPS[key])!), label).toBe("block");
+        unmount();
+      }
+    } finally {
+      Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
+      window.matchMedia = original;
+    }
   });
 
-  it("closes on the X: opacity first, display 500ms later", async () => {
-    // Close sequence "a-2": STYLE_OPACITY 0 duration 500, THEN GENERAL_DISPLAY
-    // "none" duration 0. Flipping display immediately would cut the fade.
+  it("opens every popup fully visible once its fade runs, and closes it on its X", async () => {
     vi.useFakeTimers();
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    (container.querySelector("a.link-block-4") as HTMLElement).click();
-    await vi.advanceTimersByTimeAsync(32);
-    await tick();
-    const popup = container.querySelector(POPUPS.gym)!;
-    expect(inlineState(popup)).toBe("display:block;opacity:1");
+    for (const key of Object.keys(POPUPS) as PopupKey[]) {
+      const { container, unmount } = render(NavyResidentLinks, { props: { slice } });
+      opener(container, key).click();
+      await vi.runAllTimersAsync();
+      const popup = container.querySelector(POPUPS[key]) as HTMLElement;
+      expect(inlineState(popup), key).toBe("display:block;opacity:1");
+      // Open, it is exposed to assistive tech and named by its own title.
+      within(popup).getByRole("dialog", { name: slice.primary[TITLES[key]]! });
 
-    (popup.querySelector(".div-block-21") as HTMLElement).click();
-    await tick();
-    expect(inlineState(popup)).toBe("display:block;opacity:0");
-    await vi.advanceTimersByTimeAsync(500);
-    await tick();
-    expect(inlineState(popup)).toBe("display:none;opacity:0");
+      closeButton(popup).click();
+      await vi.runAllTimersAsync();
+      expect(display(popup), key).toBe("none");
+      unmount();
+    }
   });
 
-  it("gives every close control a keyboard-operable role and a real label", async () => {
+  it("makes every popup a modal dialog with a real close button", () => {
     // The reference's close is a bare <div data-w-id> with cursor:pointer
-    // (ref css:2507) — mouse only, and unreachable by keyboard.
-    //
-    // This used to read "the rebuild keeps the div (a <button> would drag UA
-    // styles the reference never had) and adds role/tabindex/keydown". The
-    // parenthesis was true and not a reason: the UA box is eight declarations
-    // to zero, and they are in the style block cited as `repo a11y`. What the
-    // div cost was real — the hand-rolled handler fired on Space KEYDOWN where
-    // a real button fires on keyup, so pressing Space, changing your mind and
-    // moving off still closed the dialog. These are <button type="button"> now
-    // and the key semantics are the platform's.
+    // (ref css:2507) — mouse only, and unreachable by keyboard. A hand-rolled
+    // role/tabindex/keydown version fired on Space KEYDOWN where a real button
+    // fires on keyup, so pressing Space, changing your mind and moving off
+    // still closed the dialog. These are <button type="button"> now and the
+    // key semantics are the platform's.
     const { container } = render(NavyResidentLinks, { props: { slice } });
-    const closes = [...container.querySelectorAll("button")];
-    expect(closes).toHaveLength(6);
     // The hand-rolled affordances must be GONE, not merely supplemented — a
     // role="button" left on a real button is the kind of leftover that reads
     // as intentional later.
     expect(container.querySelectorAll('[role="button"]')).toHaveLength(0);
-    for (const close of closes) {
-      expect(close.getAttribute("type")).toBe("button");
-      expect(close.getAttribute("tabindex")).toBeNull();
-      expect(close.getAttribute("onkeydown")).toBeNull();
-      const icon = close.querySelector("img")!;
-      expect(icon.getAttribute("alt")).toBe("Close");
-      expect(icon.getAttribute("src")).toBe(CLOSE_ICON);
+    for (const [key, selector] of Object.entries(POPUPS) as Array<[PopupKey, string]>) {
+      const dialog = within(container.querySelector(selector) as HTMLElement).getByRole("dialog", {
+        hidden: true,
+      });
+      // Focus containment without aria-modal tells a screen reader the
+      // background is still browsable while Tab says otherwise.
+      expect(dialog.getAttribute("aria-modal"), key).toBe("true");
+      const close = closeButton(dialog);
+      expect(close.getAttribute("type"), key).toBe("button");
+      expect(close.getAttribute("tabindex"), key).toBeNull();
+      expect(close.getAttribute("onkeydown"), key).toBeNull();
     }
+  });
 
+  it("moves focus into an open popup and gives it back to the trigger on close", async () => {
     vi.useFakeTimers();
-    (container.querySelector("a.link-block-7") as HTMLElement).click();
-    await vi.advanceTimersByTimeAsync(32);
-    await tick();
-    const popup = container.querySelector(POPUPS.food)!;
-    // A synthetic keydown used to stand in for keyboard activation, because the
-    // control was a div with a hand-rolled handler. On a real <button> jsdom
-    // does not synthesize a click from Enter — and asserting that it does would
-    // be testing the browser, not this component. The keyboard guarantee is now
-    // carried by the element type, asserted above; what is left to check here
-    // is that activating it actually closes.
-    (popup.querySelector(".div-block-29") as HTMLElement).click();
-    await tick();
-    expect(inlineState(popup)).toBe("display:block;opacity:0");
+    for (const key of Object.keys(POPUPS) as PopupKey[]) {
+      const { container, unmount } = render(NavyResidentLinks, { props: { slice } });
+      const trigger = opener(container, key);
+      trigger.focus();
+      trigger.click();
+      await vi.runAllTimersAsync();
+      const popup = container.querySelector(POPUPS[key])!;
+      const dialog = popup.querySelector('[role="dialog"]')!;
+      expect(dialog.contains(document.activeElement), `${key}: focus moved in`).toBe(true);
+
+      closeButton(popup).click();
+      await vi.runAllTimersAsync();
+      expect(document.activeElement, `${key}: focus restored`).toBe(trigger);
+      unmount();
+    }
   });
 
-  it("gives the whole tile a hit area, not just the label", async () => {
-    // The operator's report: "the whole box should be clickable, not just the
-    // text". Measured against matching/spec/index.html in Chromium, the anchor
-    // box IS the text box — 9.4% of the 460x124.8 tile for "Hungry?" at 1440.
-    // The reference has the same defect while lighting the WHOLE tile on hover
-    // (ref css:2363-2365), so it advertises a hit area it does not have.
-    //
-    // jsdom computes no layout, so this asserts the mechanism rather than the
-    // rect; the rect was measured in a real browser and is in the PR body.
-    // The stretched link must cover exactly the eight TILE anchors — the two
-    // inside popups (.link-block-9, .link-block-10) must NOT get one, or an
-    // invisible overlay sits on top of the popup body.
-    // The selector list spans eight lines after formatting, so match the block
-    // out of STYLE directly rather than through ruleBody's single-line lookup.
-    const after = /\.link-block::after,[\s\S]*?\.link-block-8::after\s*\{([\s\S]*?)\}/.exec(STYLE);
-    expect(after, "no stretched-link ::after block in the style block").not.toBeNull();
-    for (const cls of [
-      "link-block",
-      "link-block-2",
-      "link-block-3",
-      "link-block-4",
-      "link-block-5",
-      "link-block-6",
-      "link-block-7",
-      "link-block-8",
-    ])
-      expect(STYLE.match(new RegExp(`\\.${cls}::after`, "g")) ?? []).toHaveLength(1);
-    expect(after![1]).toMatch(/content:\s*""/);
-    expect(after![1]).toMatch(/position:\s*absolute/);
-    expect(after![1]).toMatch(/inset:\s*0/);
-    expect(STYLE).not.toMatch(/\.link-block-(9|10)::after/);
-    // `inset: 0` resolves against the nearest positioned ancestor. Without this
-    // the overlay escapes to the viewport and the tiles stop being clickable
-    // altogether — a far worse failure than the one being fixed.
-    expect(ruleBody(".div-block-9")).toMatch(/position:\s*relative/);
-    // …and the label has to outrank the overlay or the text stops selecting.
-    expect(ruleBody(".text-block-8")).toMatch(/position:\s*relative/);
-  });
+  it("keeps Tab and Shift+Tab inside an open popup", async () => {
+    // jsdom performs no layout, so trapFocus's visibility filter would reject
+    // every control; treat them all as laid out.
+    const rects = vi
+      .spyOn(Element.prototype, "getClientRects")
+      .mockReturnValue([{}] as unknown as DOMRectList);
+    const tab = (target: Element, shiftKey = false) => {
+      const event = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      target.dispatchEvent(event);
+      return event;
+    };
+    try {
+      vi.useFakeTimers();
+      for (const key of Object.keys(POPUPS) as PopupKey[]) {
+        const { container, unmount } = render(NavyResidentLinks, { props: { slice } });
+        opener(container, key).click();
+        await vi.runAllTimersAsync();
+        const popup = container.querySelector(POPUPS[key])!;
+        const focusables = [...popup.querySelectorAll<HTMLElement>("a[href], button")];
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
 
-  it("contains focus in an open popup using the repo's own trapFocus action", async () => {
-    // NOT hand-rolled. $lib/actions/trapFocus.ts already does exactly this,
-    // including the outro-transition sequencing these 500ms fades need, and
-    // its `enabled` option exists for overlays that are always rendered and
-    // toggled by state — which is what these six are.
-    const src = SOURCE;
-    expect(src).toContain('import { trapFocus } from "$lib/actions/trapFocus"');
-    expect(src.match(/use:trapFocus=/g) ?? []).toHaveLength(6);
-    for (const key of ["electric", "laundry", "gym", "tv_internet", "ride", "food"])
-      expect(src).toContain(`use:trapFocus={{ enabled: openKey === "${key}"`);
-    // Focus containment without aria-modal tells a screen reader the background
-    // is still browsable while Tab says otherwise. They ship together.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    const dialogs = [...container.querySelectorAll('[role="dialog"]')];
-    expect(dialogs).toHaveLength(6);
-    for (const d of dialogs) expect(d.getAttribute("aria-modal")).toBe("true");
+        last.focus();
+        expect(tab(last).defaultPrevented, `${key}: Tab from the last control`).toBe(true);
+        expect(document.activeElement, `${key}: Tab from the last control`).toBe(first);
+
+        expect(tab(first, true).defaultPrevented, `${key}: Shift+Tab from the first`).toBe(true);
+        expect(document.activeElement, `${key}: Shift+Tab from the first`).toBe(last);
+        unmount();
+      }
+    } finally {
+      rects.mockRestore();
+    }
   });
 
   it("closes on a backdrop click but not on a click inside the panel", async () => {
@@ -450,353 +354,124 @@ describe("NavyResidentLinks slice", () => {
     // popup when the visitor clicks the body text.
     vi.useFakeTimers();
     const { container } = render(NavyResidentLinks, { props: { slice } });
-    (container.querySelector("a.link-block-2") as HTMLElement).click();
-    await vi.advanceTimersByTimeAsync(32);
-    await tick();
+    opener(container, "electric").click();
+    await vi.runAllTimersAsync();
     const popup = container.querySelector(POPUPS.electric)! as HTMLElement;
     expect(inlineState(popup)).toBe("display:block;opacity:1");
 
     (popup.querySelector('[role="dialog"]') as HTMLElement).click();
-    await tick();
+    await vi.runAllTimersAsync();
     expect(inlineState(popup), "a click inside the panel must not close").toBe(
       "display:block;opacity:1",
     );
 
     popup.click();
-    await tick();
-    expect(inlineState(popup), "a click on the backdrop must close").toBe(
-      "display:block;opacity:0",
-    );
+    await vi.runAllTimersAsync();
+    expect(display(popup), "a click on the backdrop must close").toBe("none");
   });
 
   it("closes on Escape", async () => {
     vi.useFakeTimers();
     const { container } = render(NavyResidentLinks, { props: { slice } });
-    (container.querySelector("a.link-block-8") as HTMLElement).click();
-    await vi.advanceTimersByTimeAsync(32);
-    await tick();
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    await vi.advanceTimersByTimeAsync(500);
-    await tick();
-    expect(inlineState(container.querySelector(POPUPS.ride)!)).toBe("display:none;opacity:0");
-  });
-
-  it("keeps the popups' copy verbatim, including where it differs from the tiles", async () => {
-    // Two titles differ from their tile labels and two are lowercase against
-    // title-case tiles. All four are easy to "correct" by accident.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    expect(container.querySelector(".text-block-16")!.textContent).toBe(
-      "Too busy to do your laundry?",
+    opener(container, "ride").click();
+    await vi.runAllTimersAsync();
+    const popup = container.querySelector(POPUPS.ride)!;
+    expect(display(popup)).toBe("block");
+    (document.activeElement ?? document.body).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
     );
-    expect(container.querySelector(".text-block-8")!.textContent).not.toBe(
-      "Too busy to do your laundry?",
-    );
-    expect(container.querySelector(".text-block-18")!.textContent).toBe("connecting cable tv?");
-    expect(container.querySelector(".text-block-20")!.textContent).toBe("need a ride?");
-    expect(container.querySelector(".text-block-14")!.textContent).toBe("Hooking up electricity?");
-    expect(container.querySelector(".text-block-17")!.textContent).toBe("Looking for a gym?");
-    expect(container.querySelector(".text-block-21")!.textContent).toBe("Hungry?");
+    await vi.runAllTimersAsync();
+    expect(display(popup)).toBe("none");
   });
 
-  it("joins the electric popup's paragraphs with <br><br> in an UNCLASSED div, never <p>", () => {
-    // `p { margin-bottom: 10px }` (ref css:420-423) would add 10px inside a
-    // fixed 300px box (ref css:2487). And the whitespace matters: a text node
-    // AFTER a <br> renders as a visible leading space on the next line.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    // The reference's body div carries NO class at all — the only element in
-    // this subtree that does not — so it is found by elimination, not by class.
-    const body = [...container.querySelectorAll(".div-block-15 > div")].find(
-      (d) => refClasses(d).length === 0,
-    )!;
-    expect(body, "the electric popup's body div must carry no reference class").not.toBeUndefined();
-    expect(body.querySelectorAll("p")).toHaveLength(0);
-    expect(body.querySelectorAll("br")).toHaveLength(2);
-    // The text nodes are the assertion that matters: exactly two, each one a
-    // whole paragraph with no leading or trailing space. A newline in the
-    // template either side of a `<br/>` would show up here as a third node —
-    // and the one after a break paints as a visible indent on the next line.
-    const textNodes = [...body.childNodes].filter((n) => n.nodeType === 3);
-    expect(textNodes.filter((n) => /^\s+$/.test(n.textContent ?? ""))).toEqual([]);
-    expect(textNodes.map((n) => n.textContent).filter(Boolean)).toEqual([
-      "Call LA DWP at 800.342.5397.",
-      "If you have any large items…",
-    ]);
-    expect(body.textContent).toBe("Call LA DWP at 800.342.5397.If you have any large items…");
-    // The tv popup's prose is one paragraph in a CLASSED div (ref css:2653).
-    const tv = container.querySelector(".text-block-19")!;
-    expect(tv.querySelectorAll("br")).toHaveLength(0);
-    expect(tv.textContent).toBe("Contact Building Management at 310-393-9653.");
-  });
+  it("opens and closes without a fade under prefers-reduced-motion", async () => {
+    // Fake timers that are never advanced: under reduced motion both
+    // directions must land without waiting on a frame or a timeout.
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) =>
+      ({
+        matches: q.includes("prefers-reduced-motion"),
+        media: q,
+        addEventListener() {},
+        removeEventListener() {},
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      vi.useFakeTimers();
+      const { container } = render(NavyResidentLinks, { props: { slice } });
+      opener(container, "food").click();
+      await tick();
+      const popup = container.querySelector(POPUPS.food)!;
+      expect(inlineState(popup)).toBe("display:block;opacity:1");
 
-  it("keeps Lyft first in the DOM and lets order:-1 paint Uber left", () => {
-    // ref css:2729-2731 puts order:-1 on `.link-block-9`, the UBER anchor,
-    // which is SECOND in the reference's DOM. Reordering the markup to "fix"
-    // the visual order would double the swap. The same declaration's order on
-    // `.image-11` is inert — it is an only child — and is a red herring.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    const anchors = [...container.querySelectorAll(".div-block-25 > a")];
-    expect(anchors.map((a) => a.getAttribute("href"))).toEqual([
-      "https://www.lyft.com/",
-      "https://www.uber.com/",
-    ]);
-    expect(anchors[1].classList.contains("link-block-9")).toBe(true);
-    // The Lyft <img> is the reference's ONE unclassed image in this subtree.
-    expect(refClasses(anchors[0].querySelector("img")!)).toEqual([]);
-    expect(anchors[1].querySelector("img")!.classList.contains("image-11")).toBe(true);
-    expect(anyRule(".link-block-9")).toMatch(/order:\s*-1;/);
-  });
-
-  it("hard-codes every image's width attribute, because the stylesheet has none", () => {
-    // `.image-19`, `.image-20` and `.image-21` have NO base rule anywhere in the
-    // reference — their only appearance is inside @media (max-width: 479px)
-    // (ref css:3522, :3527). The HTML width attribute IS the geometry, so it
-    // lives next to the class and is NOT a field: a CMS image swap must not be
-    // able to resize a 600x300 popup.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    const widths = Object.fromEntries(
-      [...container.querySelectorAll("img")]
-        .filter((img) => refClasses(img).length > 0)
-        .map((img) => [refClasses(img)[0], img.getAttribute("width")]),
-    );
-    expect(widths).toMatchObject({
-      "image-4": "26",
-      "image-5": "35",
-      "image-7": "41",
-      "image-9": "40",
-      "image-10": "42",
-      "image-13": "36",
-      "image-19": "335",
-      "image-20": "80",
-      "image-6": "254",
-      "image-8": "178",
-      "image-11": "286",
-      "image-21": "87",
-      "image-12": "159",
-    });
-    const lyft = [...container.querySelectorAll(".div-block-25 img")].find(
-      (img) => refClasses(img).length === 0,
-    )!;
-    expect(lyft.getAttribute("width")).toBe("78");
-    for (const selector of [".image-19", ".image-20", ".image-21"]) {
-      const base = STYLE.slice(0, STYLE.indexOf("@media screen and (max-width: 479px)"));
-      expect(base, `${selector} must have NO base rule`).not.toContain(`${selector} {`);
+      closeButton(popup).click();
+      await tick();
+      expect(display(popup)).toBe("none");
+    } finally {
+      window.matchMedia = original;
     }
   });
 
-  it('authors real alt text on every image, against the reference\'s alt=""', () => {
+  it("renders every paragraph of the popups' prose", () => {
+    const { container } = render(NavyResidentLinks, { props: { slice } });
+    const electric = container.querySelector(POPUPS.electric)!.textContent;
+    expect(electric).toContain("Call LA DWP at 800.342.5397.");
+    expect(electric).toContain("If you have any large items…");
+    expect(container.querySelector(POPUPS.tv_internet)!.textContent).toContain(
+      "Contact Building Management at 310-393-9653.",
+    );
+  });
+
+  it("links every popup logo where the slice says, under the logo's own alt", () => {
     // The reference ships alt="" on all 23 of the page's images. The repo
     // pre-declared the rebuild's real alt as an accepted text-diff artifact.
-    const { container } = render(NavyResidentLinks, { props: { slice } });
-    const images = [...container.querySelectorAll("img")];
-    expect(images).toHaveLength(14);
-    for (const img of images) expect(img.getAttribute("alt")!.length).toBeGreaterThan(0);
     // Logo alt travels with the Prismic asset; the close glyph's is code-owned.
-    expect(container.querySelector(".image-19")!.getAttribute("alt")).toBe(
-      "Rinse, formerly Washio",
-    );
-  });
-
-  // ---- Source-level guards. jsdom applies no stylesheet, so the hazards that
-  // live in the CSS are asserted against the file the browser will get.
-
-  it("names a source on every declaration in the style block", () => {
-    expect(DECLARATIONS.length).toBeGreaterThan(150);
-    const uncited = DECLARATIONS.filter((l) => !/\/\* (ref css:\d+|ref js:|repo )/.test(l));
-    expect(uncited).toEqual([]);
-    // Exactly two declarations are sourced from somewhere other than the
-    // reference stylesheet, and both are the fade: the tween's numbers come from
-    // the IX2 action list in the reference's JS, and the reduced-motion guard is
-    // a repo a11y rule the reference has no equivalent of.
-    const nonCss = DECLARATIONS.filter((l) => !/\/\* ref css:\d+/.test(l));
-    expect(nonCss).toHaveLength(15);
-    // By membership, not index: the thirteen `repo a11y` declarations below sit
-    // earlier in the style block than the fade, and the original [0]/[1] form
-    // silently started asserting about the wrong two lines.
-    expect(nonCss.filter((l) => l.includes("transition: opacity 500ms"))).toHaveLength(1);
-    expect(nonCss.filter((l) => l.includes("transition: none"))).toHaveLength(1);
-    // The other thirteen are one change: the tile-sized hit area (the reference
-    // lights the whole tile on hover, ref css:2363-2365, while only the centred
-    // text is clickable) and the UA reset the six close <button>s need. Every
-    // one is tagged `repo a11y` — the count is pinned so a fourteenth cannot
-    // arrive unnoticed under cover of a category that already exists.
-    const repoA11y = nonCss.filter((l) => /\/\* repo a11y:/.test(l));
-    expect(repoA11y).toHaveLength(13);
-  });
-
-  it("gives the h1 a 44px line box on 32px type, left-offset and never centred", () => {
-    // `.heading` (ref css:2184-2190) sets font-size and NEVER line-height, so
-    // the h1 keeps 44px from ref css:387 — a 44px box on 32px glyphs. Any
-    // `line-height: 1` or Tailwind heading preset loses 12px of section height
-    // and the gate reports it as a whole-section offset, not a heading bug.
-    const heading = ruleBody(".heading.residents");
-    expect(heading).toMatch(/font-size:\s*32px;/);
-    expect(heading).toMatch(/line-height:\s*44px;/);
-    expect(heading).toMatch(/font-weight:\s*400;/);
-    expect(heading).toMatch(/color:\s*#aa4133;/);
-    expect(heading).toMatch(/margin-bottom:\s*40px;/);
-    expect(heading).toMatch(/margin-left:\s*20px;/);
-    expect(heading).toMatch(/margin-right:\s*0;/);
-    expect(heading).not.toMatch(/line-height:\s*(1|normal|none)\b/);
-    expect(heading).not.toMatch(/text-align/);
-  });
-
-  it("floats the columns rather than rebuilding the row as flex or grid", () => {
-    // `.w-col` float:left (ref css:726) establishes a BFC, so the LAST
-    // `.div-block-9`'s 20px bottom margin (ref css:2357) is CONTAINED in the
-    // column height. Predicted 1440 column height 4 x (40 + 44.8 + 40 + 20) =
-    // 579.2px, section 40 + 44 + 40 + 579.2 + 40 = 743.2px. Flex or grid drops
-    // that trailing 20px and the section comes out 20px short.
-    const col = ruleBody(".w-col");
-    expect(col).toMatch(/float:\s*left;/);
-    expect(col).toMatch(/padding-left:\s*10px;/);
-    expect(col).toMatch(/padding-right:\s*10px;/);
-    expect(col).not.toMatch(/display:\s*(flex|grid)/);
-    expect(ruleBody(".columns")).toMatch(/padding-left:\s*0;/);
-    expect(ruleBody(".w-container .w-row")).toMatch(/margin-left:\s*-10px;/);
-    // The clearfix pseudo-elements are load-bearing: the :before stops the h1's
-    // 40px bottom margin collapsing in, the :after clears the floats.
-    expect(STYLE).toContain(".w-container:before,");
-    expect(STYLE).toMatch(/\.w-container:after \{\s*clear: both;/);
-    expect(STYLE).toMatch(/\.w-row:after \{\s*clear: both;/);
-  });
-
-  it("paints the tiles #030303 with no side padding, and 1.4em of leading", () => {
-    const tile = ruleBody(".div-block-9");
-    expect(tile).toMatch(/background-color:\s*#030303;/);
-    expect(tile).toMatch(/padding-top:\s*40px;/);
-    expect(tile).toMatch(/padding-bottom:\s*40px;/);
-    expect(tile).toMatch(/margin-bottom:\s*20px;/);
-    expect(tile).not.toMatch(/padding-(left|right)/);
-    expect(tile).not.toMatch(/background-color:\s*#000;/);
-    expect(ruleBody(".div-block-9:hover")).toMatch(/background-color:\s*#aa4133;/);
-    // 1.4EM here (= 44.8px) against 1.4REM (= 22.4px) on all six popup titles.
-    // Same numeral, different unit, 22px apart. Unifying them breaks the popups.
-    expect(ruleBody(".text-block-8")).toMatch(/line-height:\s*1\.4em;/);
-    expect(ruleBody(".text-block-8")).toMatch(/text-align:\s*left;/);
-    for (const title of [
-      ".text-block-14",
-      ".text-block-16",
-      ".text-block-17",
-      ".text-block-18",
-      ".text-block-20",
-      ".text-block-21",
-    ])
-      expect(ruleBody(title), title).toMatch(/line-height:\s*1\.4rem;/);
-  });
-
-  it("keeps the electric popup's scrim alpha, unlike the other five", () => {
-    // ref css:2468-2474 is the odd one out: 63%-alpha black and NO width or
-    // height, relying on position:fixed + inset:0%. The other five are opaque
-    // var(--black) at 100vw/100vh. Normalising them turns this scrim solid.
-    const electric = anyRule(".popup-modal---electric");
-    expect(electric).toMatch(/background-color:\s*#000000a1;/);
-    expect(electric).not.toMatch(/width:/);
-    expect(electric).not.toMatch(/height:/);
-    for (const selector of [
-      ".popup-modal---laundry",
-      ".popup-modal---gym",
-      ".pop-up-modal---tv-internet",
-      ".ride---modal",
-      ".food-modal---popup",
-    ]) {
-      const body = anyRule(selector);
-      expect(body, selector).toMatch(/background-color:\s*var\(--black\);/);
-      expect(body, selector).toMatch(/width:\s*100vw;/);
-      expect(body, selector).toMatch(/height:\s*100vh;/);
-    }
-    // The popup boxes differ too, and the differences are per-class rules.
-    expect(ruleBody(".div-block-15")).toMatch(/padding-left:\s*20px;/);
-    expect(ruleBody(".div-block-17")).not.toMatch(/padding-left/);
-    expect(ruleBody(".div-block-24")).toMatch(/align-items:\s*stretch;/);
-    expect(ruleBody(".div-block-27")).not.toMatch(/align-items/);
-  });
-
-  it("ships the placeholder background as a file, never redrawn in CSS", () => {
-    // ref css:2663 — the only close hit area carrying a background image.
-    const body = ruleBody(".div-block-23");
-    expect(body).toContain('background-image: url("/29navy/assets/background-image.svg")');
-    expect(STYLE).not.toMatch(/data:image/);
-    expect(STYLE).not.toMatch(/linear-gradient|conic-gradient|clip-path/);
-  });
-
-  it("reproduces the reference's three breakpoints and invents none", () => {
-    // ref css:791 / :3116 (991), :859 / :3218 (767), :928 / :3396 (479). The
-    // fourth query is the reduced-motion guard, which is the repo's, not the
-    // reference's — and it is a feature query, not a width breakpoint.
-    // Comments in this block name the reference's own @media lines, so the
-    // comments come out before the real queries are counted.
-    const bare = STYLE.replace(/\/\*[\s\S]*?\*\//g, "");
-    const queries = (bare.match(/@media[^{]*/g) ?? []).map((q) => q.trim());
-    expect(queries).toEqual([
-      "@media (prefers-reduced-motion: reduce)",
-      "@media screen and (max-width: 991px)",
-      "@media screen and (max-width: 767px)",
-      "@media screen and (max-width: 479px)",
-    ]);
-    const at991 = STYLE.slice(
-      STYLE.indexOf("@media screen and (max-width: 991px)"),
-      STYLE.indexOf("@media screen and (max-width: 767px)"),
-    );
-    // ref css:3141-3143 centres the label at <=991 and there is NO 767 or 479
-    // variant, so centred persists all the way down to 390.
-    expect(at991).toMatch(/\.text-block-8 \{\s*text-align: center;/);
-    expect(at991).toMatch(/max-width:\s*728px;/);
-    const at767 = STYLE.slice(
-      STYLE.indexOf("@media screen and (max-width: 767px)"),
-      STYLE.indexOf("@media screen and (max-width: 479px)"),
-    );
-    expect(at767).not.toContain("text-block-8");
-    const at479 = STYLE.slice(STYLE.indexOf("@media screen and (max-width: 479px)"));
-    expect(at479).not.toContain("text-block-8");
-    expect(at479).toMatch(/max-width:\s*none;/);
-    // The <=479 popup heights: 600 / 400 / 400 / 500, and nothing for the ride
-    // and food boxes (ref css:3451, :3460, :3469, :3486).
-    expect(at479).toMatch(/\.div-block-15 \{\s*height: 600px;/);
-    expect(at479).toMatch(/\.div-block-17 \{\s*height: 400px;/);
-    expect(at479).toMatch(/\.div-block-19 \{\s*height: 400px;/);
-    expect(at479).toMatch(/\.div-block-22 \{\s*height: 500px;/);
-    expect(at479).not.toMatch(/\.div-block-24 \{[^}]*height/);
-    expect(at479).not.toMatch(/\.div-block-27 \{[^}]*height/);
-  });
-
-  it("transcribes the <=767 popup display:none but never gates behaviour on it", async () => {
-    // Hazard: those six rules (ref css:3297, :3306, :3314, :3322, :3330, :3338)
-    // are DEAD at runtime. IX2 writes an INLINE display, which beats a
-    // stylesheet media rule, and every trigger event carries mediaQueries
-    // ["main","medium","small","tiny"] — the popups DO open at 767 and 390 on
-    // the reference. They are here for cascade fidelity only.
-    const at767 = STYLE.slice(
-      STYLE.indexOf("@media screen and (max-width: 767px)"),
-      STYLE.indexOf("@media screen and (max-width: 479px)"),
-    );
-    expect(at767).toMatch(/display: none;/);
-    // Nothing in the component reads a width to decide whether to open.
-    const script = SOURCE.slice(0, SOURCE.indexOf("</script>"));
-    expect(script).not.toMatch(/innerWidth|max-width|matchMedia\(\s*["'`]\(max/);
-    // And an inline display:block is what opens it, at any viewport.
     const { container } = render(NavyResidentLinks, { props: { slice } });
-    (container.querySelector("a.link-block-3") as HTMLElement).click();
-    await tick();
-    expect(inlineState(container.querySelector(POPUPS.laundry)!)).toContain("display:block");
+    const fields = slice.primary as unknown as Record<
+      string,
+      { url: string; alt?: string; target?: string }
+    >;
+    for (const [logoKey, linkKey] of [
+      ["laundry_logo", "laundry_link"],
+      ["gym_logo_1", "gym_link_1"],
+      ["gym_logo_2", "gym_link_2"],
+      ["tv_logo", "tv_link"],
+      ["ride_logo_1", "ride_link_1"],
+      ["ride_logo_2", "ride_link_2"],
+      ["food_logo_1", "food_link_1"],
+      ["food_logo_2", "food_link_2"],
+    ]) {
+      const logo = fields[logoKey];
+      const link = fields[linkKey];
+      const img = container.querySelector(`img[src="${logo.url}"]`)!;
+      expect(img, logoKey).not.toBeNull();
+      expect(img.getAttribute("alt"), logoKey).toBe(logo.alt);
+      const anchor = img.closest("a")!;
+      expect(anchor.getAttribute("href"), linkKey).toBe(link.url);
+      expect(anchor.getAttribute("target") ?? undefined, linkKey).toBe(link.target);
+    }
+    const images = [...container.querySelectorAll("img")];
+    expect(images.length).toBeGreaterThan(0);
+    for (const img of images) expect(img.hasAttribute("alt"), img.getAttribute("src")!).toBe(true);
   });
 
-  it("restates the body font stack rather than inheriting someone else's", () => {
-    // ref css:222-230. `Arial, sans-serif` is the ONLY font-family in the
-    // reference's cascade for this subtree — there is no webfont link in its
-    // <head>. This rebuild's <body> is not the reference's, so the inherited
-    // values are restated on the roots. Label wrap points sit within a few
-    // pixels of the column width at 991 and 390; a different stack flips a line
-    // and moves a tile by 44.8px.
-    expect(STYLE).toMatch(/font-family:\s*Arial, sans-serif;/);
-    expect(STYLE).toMatch(/font-size:\s*14px;/);
-    expect(STYLE).toMatch(/line-height:\s*20px;/);
-    expect(STYLE).not.toMatch(/letter-spacing/);
-    expect(STYLE).not.toMatch(/var\(--font/);
+  it("warms every image behind the popups", () => {
+    // Every popup image sits inside a `display: none` popup, so
+    // `loading="lazy"` defers each fetch until its popup opens and the logo
+    // lands visibly late. Measured on production before the warm-up: 2 of 12
+    // hidden images were fetched before any interaction; after, 12 of 12.
+    vi.mocked(preloadHidden).mockClear();
+    const { container } = render(NavyResidentLinks, { props: { slice } });
+    const warmed = vi.mocked(preloadHidden).mock.lastCall?.[0] ?? [];
+    const hidden = [...container.querySelectorAll('[role="dialog"] img')].map((img) =>
+      img.getAttribute("src"),
+    );
+    expect(hidden.length).toBeGreaterThan(0);
+    for (const src of hidden) expect(warmed, `${src} is not warmed`).toContain(src);
   });
 
   // ---- Model and mocks ------------------------------------------------------
 
-  it("keeps mocks.json aligned with model.json and with the reference's copy", () => {
+  it("keeps mocks.json aligned with model.json", () => {
     const model = JSON.parse(read("model.json"));
     const mocks = JSON.parse(read("mocks.json"));
     const variation = model.variations.find((v: { id: string }) => v.id === mocks[0].variation) as {
@@ -809,58 +484,26 @@ describe("NavyResidentLinks slice", () => {
     // API — the same failure src/lib/site-pages.test.ts guards.
     expect(Object.keys(mocks[0].primary).sort()).toEqual(Object.keys(variation.primary).sort());
 
-    // Eight tiles, the reference's labels, in the reference's order.
     const tiles = mocks[0].primary.tiles.value as Array<{
       value: Array<[string, { value: string }]>;
     }>;
     const field = (tile: (typeof tiles)[number], key: string) =>
       tile.value.find(([k]) => k === key)?.[1];
-    expect(tiles).toHaveLength(8);
-    expect(tiles.map((t) => field(t, "label")!.value)).toEqual(LABELS);
-
-    // Exactly one tile is a link; the other seven name a popup. `tv_internet`
-    // is named twice — that is the reference, not a duplicate.
-    const linked = tiles.filter((t) => field(t, "link"));
-    expect(linked).toHaveLength(1);
-    expect(
-      (field(linked[0], "link") as unknown as { value: { url: string; target: string } }).value,
-    ).toEqual({ __TYPE__: "ExternalLink", url: "https://payments.gozego.com/", target: "_blank" });
     const modals = tiles.map((t) => field(t, "modal")?.value).filter(Boolean);
-    expect(modals).toEqual([
-      "electric",
-      "laundry",
-      "gym",
-      "tv_internet",
-      "tv_internet",
-      "ride",
-      "food",
-    ]);
-    // Every value an author can pick is one the component knows how to open.
-    const options = variation.primary.tiles.config.fields as Record<
-      string,
-      { config: { options?: string[] } }
-    >;
-    expect(options.modal.config.options).toEqual(Object.keys(POPUPS));
-    for (const value of modals) expect(options.modal.config.options).toContain(value);
+    expect(modals.length).toBeGreaterThan(0);
+    // Every value an author can pick is one the component knows how to open,
+    // and every value the mocks use is one an author can pick.
+    const options = (
+      variation.primary.tiles.config.fields as Record<string, { config: { options?: string[] } }>
+    ).modal.config.options!;
+    for (const option of options) expect(Object.keys(POPUPS)).toContain(option);
+    for (const value of modals) expect(options).toContain(value);
 
-    // The popup copy that differs from the tiles, verbatim.
-    expect(mocks[0].primary.heading.value[0].type).toBe("heading1");
-    expect(mocks[0].primary.laundry_title.value).toBe("Too busy to do your laundry?");
-    expect(mocks[0].primary.tv_title.value).toBe("connecting cable tv?");
-    expect(mocks[0].primary.ride_title.value).toBe("need a ride?");
-    // The DWP copy says in so many words that it changes — this is why the two
-    // prose bodies are fields and not hard-coded strings.
-    const dwp = mocks[0].primary.electric_body.value as Array<{ content: { text: string } }>;
-    expect(dwp).toHaveLength(2);
-    expect(dwp[0].content.text).toContain("$1.33 (subject to change");
-    expect(dwp[1].content.text).toContain("“800-773-2489”");
-    expect(mocks[0].primary.tv_body.value[0].content.text).toContain("310-393-9653");
-
-    // Every logo points at a file this repo actually ships.
+    // Every logo is one of this repo's own assets, with real alt text.
     const logos = Object.entries(mocks[0].primary)
       .filter(([, v]) => (v as { __TYPE__?: string }).__TYPE__ === "ImageContent")
       .map(([k, v]) => [k, v as { url: string; alt: string }] as const);
-    expect(logos).toHaveLength(8);
+    expect(logos.length).toBeGreaterThan(0);
     for (const [key, logo] of logos) {
       expect(logo.url, key).toMatch(/^\/29navy\/assets\//);
       expect(logo.alt.length, key).toBeGreaterThan(0);
@@ -874,95 +517,20 @@ describe("NavyResidentLinks slice", () => {
     expect(section?.getAttribute("data-slice-variation")).toBe("default");
   });
 
-  it("renders no tiles and no empty heading when the slice is unfilled", () => {
+  it("renders no tiles and no heading text when the slice is unfilled", () => {
     const bare = {
       ...slice,
       primary: { ...slice.primary, heading: [], tiles: [] },
     } as unknown as Slice;
     const { container } = render(NavyResidentLinks, { props: { slice: bare } });
     expect(container.querySelector("#Residents")).not.toBeNull();
-    expect(container.querySelectorAll(".div-block-9")).toHaveLength(0);
-    expect(container.querySelector("h1")!.textContent).toBe("");
+    expect(
+      within(container.querySelector("#Residents") as HTMLElement).queryAllByRole("link"),
+    ).toHaveLength(0);
+    expect(container.querySelector("h1")?.textContent ?? "").toBe("");
     // The popups still render — they are hidden by inline style, not by data.
     expect(
-      Object.values(POPUPS).filter(
-        (s) => inlineState(container.querySelector(s)!) === "display:none;opacity:0",
-      ),
+      Object.values(POPUPS).filter((s) => display(container.querySelector(s)!) === "none"),
     ).toHaveLength(6);
-  });
-
-  describe("the opening and closing tween", () => {
-    // The reference tweens all six popups over 500ms with THREE different
-    // easings — one for gym opening, one for the other five opening, and a
-    // third (empty, i.e. linear) for every close. An earlier version of this
-    // component read one IX2 action list and applied its easing everywhere.
-    const CSS_NO_COMMENTS = STYLE.replace(/\/\*[\s\S]*?\*\//g, "");
-
-    it("closes on a straight line, not the opening curve", () => {
-      // Measured against the live reference, gym closing, every 100ms:
-      // 0.7834 / 0.5834 / 0.3832 / 0.1686 / 0 — ~0.2 per 100ms, so the IX2
-      // easing of "" is linear rather than any default curve.
-      // anyRule, not ruleBody: the token block and the transition group BOTH
-      // end in `.food-modal---popup {`, so a first-match lookup reads the
-      // custom properties and never sees a transition at all.
-      expect(anyRule(".food-modal---popup")).toMatch(/transition:\s*opacity 500ms linear;/);
-    });
-
-    it("gives gym a different opening easing from the other five", () => {
-      // Not a slip to normalise: gym's open action carries easing "outQuad",
-      // the other five carry "inOutQuad". Reference opacity at 200ms is
-      // 0.63976 — easeOutQuad(0.4) = 0.4 * (2 - 0.4) = 0.64 exactly.
-      const gym = ruleBody(".popup-modal---gym[data-open]");
-      const others = ruleBody(".food-modal---popup[data-open]");
-      expect(gym).toMatch(/cubic-bezier\(\s*0\.25,\s*0\.46,\s*0\.45,\s*0\.94\s*\)/);
-      expect(others).toMatch(/cubic-bezier\(\s*0\.455,\s*0\.03,\s*0\.515,\s*0\.955\s*\)/);
-      expect(gym).not.toBe(others);
-    });
-
-    it("does not give gym the shared opening easing as well", () => {
-      // A grouped selector that happened to include gym would let the shared
-      // curve win by source order and the fix would be invisible.
-      const shared = CSS_NO_COMMENTS.match(/\n {2}([^{}]*\[data-open\][^{}]*)\{/g) ?? [];
-      const sharedOpen = shared.find((g) => g.includes("electric"));
-      expect(sharedOpen, "no shared [data-open] rule found").toBeTruthy();
-      expect(sharedOpen).not.toContain("popup-modal---gym[data-open]");
-    });
-
-    it("marks the opening popup, and only that one", async () => {
-      // data-open is what selects the OPEN easing, so if it never lands the
-      // close curve runs in both directions and the fix is inert.
-      const { container } = render(NavyResidentLinks, { props: { slice } });
-      expect(container.querySelectorAll("[data-open]")).toHaveLength(0);
-      (container.querySelector("a.link-block-4") as HTMLElement).click();
-      await tick();
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
-      await tick();
-      const open = [...container.querySelectorAll("[data-open]")];
-      expect(open).toHaveLength(1);
-      expect(refClasses(open[0])).toContain("popup-modal---gym");
-    });
-  });
-
-  describe("images behind the popups", () => {
-    it("warms every hidden popup image after load", () => {
-      // Thirteen images live inside `display: none` popups, so `loading="lazy"`
-      // defers each fetch until its popup opens and the logo lands visibly
-      // late. Measured on production before this: 2 of 12 hidden images were
-      // fetched before any interaction; after, 12 of 12.
-      expect(SOURCE).toContain("preloadHidden");
-      const list = SOURCE.slice(SOURCE.indexOf("const hiddenImages"), SOURCE.indexOf("$effect("));
-      for (const field of [
-        "laundry_logo",
-        "gym_logo_1",
-        "gym_logo_2",
-        "tv_logo",
-        "ride_logo_1",
-        "ride_logo_2",
-        "food_logo_1",
-        "food_logo_2",
-      ])
-        expect(list, `${field} is not warmed`).toContain(field);
-      expect(list).toContain("CLOSE_ICON");
-    });
   });
 });

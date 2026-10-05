@@ -10,12 +10,6 @@ dist/
 prismicio-types.d.ts
 src/lib/slices/index.ts
 
-# Verbatim excerpts of the 29navy.com reference markup, generated from the
-# capture and re-derived from it by NavyContact.test.ts. Minified onto one line
-# exactly as the reference serves it; reformatting would break the byte
-# comparison that keeps the fixture honest.
-src/lib/slices/NavyContact/reference.html
-
 # Untracked agency process artifacts (see .gitignore).
 docs/superpowers/
 scratchpad/

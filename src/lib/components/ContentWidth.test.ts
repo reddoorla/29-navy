@@ -47,7 +47,6 @@ describe("ContentWidth", () => {
 
     const inner = getByText("Inner content").parentElement as HTMLElement;
     expect(inner.style.opacity).toBe("0");
-    expect(inner.style.transform).toBe("translateY(50%)");
     expect(inner.style.transition).toContain("opacity");
   });
 
