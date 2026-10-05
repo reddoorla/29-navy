@@ -831,3 +831,20 @@ The idle machine is part of the result. The same comparison run while prettier,
 node and `gh` were in use read 88, 95, 87, 95, 96 for this branch, the 88 and 87
 carrying 317 and 357 ms of blocking time that no idle run has ever shown, plus
 one `NO_NAVSTART` trace failure. Measure with the machine left alone.
+
+## The privacy policy link joins the contact block (2026-10-05, reddoor-maintenance#1055)
+
+### [deviation] `#contact .div-block-12` gains a "Privacy Policy" line — not in the reference
+
+The reference has no `<footer>` (the reason is in `src/routes/+layout.svelte`), and `#contact.section-7` is the page's last element. GA4's terms require a posted privacy policy, so a link to `/privacy` has to sit somewhere on every page. It is one more `text-block-11` row under the contact links, styled as `.contact-link`. It is not a new component, and it adds no new rule to the transcribed stylesheet.
+
+Measured on `vite dev` before and after, at the harness matrix, on both `/` and `/dev/match/home`:
+
+| width | `#contact` before → after | text column before → after | document before → after |
+| ----- | ------------------------- | -------------------------- | ----------------------- |
+| 1440  | 712.44 → 712.44           | 712.44 → 712.44            | 4104 → 4104             |
+| 991   | 1123.89 → 1151.89         | 462 → 490                  | 4735 → 4763             |
+| 767   | 934.28 → 962.28           | 422 → 450                  | 3973 → 4001             |
+| 390   | 682.47 → 710.47           | 422 → 450                  | 3312 → 3340             |
+
+At 1440 the column has room and nothing moves. At 991 and below the column sets the section's height, which grows by exactly one 28px line box. That is 2.5% of the section at 991, 3.0% at 767 and 4.1% at 390, inside `maxHeightDelta` 0.05, and no region above `#contact` moves. Accepted because the alternative, a link absolutely positioned over the photograph or one in the navbar, would be a larger departure from the reference for the same legal need.

@@ -135,8 +135,10 @@ describe("NavyContact slice", () => {
 
     const panel = children[0];
     expect(panel.querySelector(":scope > h1.heading-3")!.textContent).toBe("Contact");
-    // Five .text-block-11 blocks: two address lines, then three link blocks.
-    const blocks = [...panel.querySelectorAll(":scope > div.text-block-11")];
+    // Five .text-block-11 blocks from the reference: two address lines, then
+    // three link blocks. A sixth, the privacy policy row, is ours and is
+    // asserted on its own below (matching/LEDGER.md, 2026-10-05).
+    const blocks = [...panel.querySelectorAll(":scope > div.text-block-11:not(.privacy)")];
     expect(blocks.length).toBe(5);
     expect(blocks[1].classList.contains("venice")).toBe(true);
     expect(blocks.filter((b) => b.classList.contains("venice")).length).toBe(1);
@@ -151,6 +153,21 @@ describe("NavyContact slice", () => {
       // anchor's own inner whitespace is what the U+200D test then measures.
       expect([...b.childNodes].filter((n) => n.nodeType === 3)).toEqual([]);
     }
+  });
+
+  it("ends the panel with one privacy policy row, after the reference's links", () => {
+    // 29 Navy has no footer, so this block carries the /privacy link
+    // (reddoor-maintenance#1055). One line box, no joiner: its height cost is
+    // measured in matching/LEDGER.md.
+    const panel = mount().querySelector("div#contact.section-7")!.children[0];
+    const rows = [...panel.querySelectorAll(":scope > div.text-block-11")];
+    expect(rows.length).toBe(6);
+    const last = rows[rows.length - 1];
+    expect(last.classList.contains("privacy")).toBe(true);
+    const a = last.querySelector(":scope > a.contact-link");
+    expect(a?.getAttribute("href")).toBe("/privacy");
+    expect(a?.textContent).toBe("Privacy Policy");
+    expect(a?.querySelectorAll("br").length).toBe(0);
   });
 
   it('renders the gate anchor "29 Navy Street" exactly', () => {
@@ -172,7 +189,9 @@ describe("NavyContact slice", () => {
     // Stripping it alone takes 84px off the black panel (462 -> 378 at <=991).
     // Expectations are derived from the reference, not retyped.
     const container = mount();
-    const anchors = [...container.querySelectorAll("a.contact-link")];
+    const anchors = [
+      ...container.querySelectorAll("div.text-block-11:not(.privacy) > a.contact-link"),
+    ];
     expect(REF_LINK_TEXT).toEqual([
       `Call us: (310) 393-9657${ZWJ}`,
       `Email us:29navy@worthe.com${ZWJ}`,
@@ -234,7 +253,9 @@ describe("NavyContact slice", () => {
     expect(REF_CONTACT).toContain('href="https://(310) 393-9653"');
     expect(REF_CONTACT).toContain(`href="mailto:29navy@worthe.com${ZWJ}"`);
 
-    const anchors = [...mount().querySelectorAll("a.contact-link")];
+    const anchors = [
+      ...mount().querySelectorAll("div.text-block-11:not(.privacy) > a.contact-link"),
+    ];
     const hrefs = anchors.map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual([
       "tel:+13103939657",
@@ -288,9 +309,12 @@ describe("NavyContact slice", () => {
     const container = mount(bare);
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("h1")).toBeNull();
-    expect(container.querySelectorAll("a").length).toBe(0);
+    // Only the privacy row's link remains; it does not depend on content.
+    expect([...container.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "/privacy",
+    ]);
     // The two address blocks and the photo wrapper still stand.
-    expect(container.querySelectorAll("div.text-block-11").length).toBe(2);
+    expect(container.querySelectorAll("div.text-block-11:not(.privacy)").length).toBe(2);
   });
 
   it("renders one block per authored link, never a hard-coded three", () => {
@@ -308,8 +332,10 @@ describe("NavyContact slice", () => {
         ],
       },
     } as unknown as Slice;
-    expect(mount(four).querySelectorAll("a.contact-link").length).toBe(4);
-    expect(mount(four).querySelectorAll("div.text-block-11").length).toBe(6);
+    expect(
+      mount(four).querySelectorAll("div.text-block-11:not(.privacy) > a.contact-link").length,
+    ).toBe(4);
+    expect(mount(four).querySelectorAll("div.text-block-11:not(.privacy)").length).toBe(6);
   });
 
   // ---- Source-level guards. jsdom applies no stylesheet, so the hazards that

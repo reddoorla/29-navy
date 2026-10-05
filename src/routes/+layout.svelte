@@ -34,6 +34,7 @@
   image={page.data.meta_image || DEFAULT_OG_IMAGE || undefined}
   imageAlt={page.data.meta_image_alt}
   url={page.url}
+  noindex={page.data.noindex === true}
 />
 <a
   href="#main-content"
