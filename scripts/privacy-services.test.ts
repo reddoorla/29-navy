@@ -75,12 +75,12 @@ export default { kit: { csp: { directives: { ...base } } } };`,
 });
 
 describe("this site", () => {
-  it("lists Netlify and the Vimeo its CSP admits, and no form, GA4 or fonts it never loads", async () => {
+  it("lists Netlify, the Vimeo its CSP admits and the GA4 its client hook starts, and no form or fonts it never loads", async () => {
     const site = join(dirname(fileURLToPath(import.meta.url)), "..");
     expect(await collectBuildServices(site)).toEqual({
       forms: false,
       newsletter: false,
-      ga4: false,
+      ga4: true,
       netlify: true,
       vimeo: true,
       youtube: false,

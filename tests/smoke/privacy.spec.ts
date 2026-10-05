@@ -7,6 +7,7 @@ test.describe("/privacy", () => {
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex");
     await expect(page.getByTestId("privacy-draft")).toBeVisible();
     await expect(page.getByTestId("service-netlify")).toBeVisible();
+    await expect(page.getByTestId("service-ga4")).toBeVisible();
     await expect(page.getByTestId("service-forms")).toHaveCount(0);
   });
 
