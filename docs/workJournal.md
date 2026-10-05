@@ -3026,6 +3026,53 @@ The starter imports the plugin as `./scripts/prismic-barrel.ts`. Here that faile
 
 Against a `main` build, the ported tests failed 4 of 20 in vitest (the bundle check, the encoded path, the null route and the exact match) and 2 of 4 in the smoke spec (both encoded paths). On the branch, all of them pass. With the plugin removed and the site rebuilt, the bundle check fails. With the hook back on the pathname, two of the hook tests fail. The `respond` helper in the older hook tests now passes a route id too, because the hook reads `event.route.id` on every request.
 
+## 2026-10-05 — Tests build; they don't freeze: the Navy CSS-literal layer leaves the gate (#72)
+
+The five Navy slices' unit tests regexed every size, colour, padding, breakpoint, easing and duration out of each component's `<style>`. They also required a `ref css:NNN` citation per declaration and pinned the count of exceptions. That was the right instrument for matching the Webflow reference, and it is the wrong one now. The site launched on 2026-09-17, and www.29navy.com redirects to this build. The first client change after close-out moved the hero from 500ms/3000ms to 1600ms/5000ms, and it paid the freeze cost through NavyHeroSlider.test.ts (matching/LEDGER.md, Post-close). The model is reddoorla/roalson-interests#256, which the native template now ships as reddoor-starter#180.
+
+**What changed.**
+
+- **Unit tests.** The CSS-literal and source-text layer is gone: 2,272 test lines out, 1,082 in. The behaviour left in place covers popups opening and closing, under reduced motion too; floor tabs and their aria; slider state with no interval literal; LCP preload; and every popup having a dialog with a named close button.
+- **Contrast.** NavyFloorPlans' hover contrast is now computed from the declared colours and must be at least 4.5. Deleting the `color: #050101` hover ink turns it red at 2.30:1.
+- **Gate.** 15 of 23 Playwright tests are tagged `@smoke`.
+- **Nightly.** The hero LCP/preload spec, which reads the live CMS, runs nightly.
+- **Hook.** The pre-commit prettier hook from reddoor-starter#169 is in.
+- **Unchanged.** `matching/` is untouched, and the `ref css:` comments stay as documentation of where each value came from.
+
+**Measured.** On `main` the full suite was 23 Playwright tests in 2.3 min locally, all green. `ci / ci` on this branch passed in 3 min 13 s. Locally, vitest passes 521, lint is clean, and svelte-check shows 0 errors (its one warning is already on `main`).
+
+**Found and filed.**
+
+- #66: nothing guards the phone aerial's `height: auto`.
+- #67: contact links drop to 3.51:1 on hover.
+- #68: CtaBanner's contrast test cannot read chromatic oklch.
+- #69: the nightly hero spec is coupled to live CMS content.
+- #70: nothing guards the hero logo's `width="143"`.
+
+#71, the dead `.prettierignore` entry, is fixed here.
+
+## 2026-10-05 — The freeze round: designer edits stay green, real bugs go red, and the resident tile's hover contrast is measured (#72)
+
+The tiers entry above claimed the gate no longer freezes design. This entry is that claim tested. Each edit below was made to the site source, run through the whole gate (vitest and the `@smoke` tier), and then reverted.
+
+**Designer edits.** Four were applied together:
+
+- the Residents heading moved from 32px to 36px;
+- the penthouse hover veil changed from #ffffff7d to #ffffff66 (the dark ink stays about 7.6:1);
+- the hero `DELAY_MS` changed from 5000 to 6000;
+- the location band moved from 100vh to 80vh.
+
+On main they turned 9 unit tests red: HeroSlider 5, ResidentLinks 1, LocationBand 1, FloorPlans 2. On this branch the gate stayed green: vitest 522, `@smoke` 15/15.
+
+**Real bugs.**
+
+- Disabling the electric popup's focus trap went red in vitest (focus moved in, Tab containment) and in `@smoke` (the resident popups at 1440 and 390).
+- Pointing the nav "Location" link at `/#location` went red in LocationBand's id check.
+
+**A belief corrected.** Deleting `restore?.focus()` from the resident popup is not a bug. `trapFocus` already returns focus to the trigger on close, so the gate is right to stay green there.
+
+**A gap closed.** A resident tile's hover going to #f2b8b0 under its white label is about 1.7:1. On main that was caught only by accident, through a `#aa4133` literal pin that the tiers PR removed, and `home.spec` hovers only the floor tabs. `NavyResidentLinks.test.ts` now composites the label ink over the tile, at rest and on hover, on the section's ground. It takes the threshold from the smallest declared label size: the label is 32px at every breakpoint and not bold, so it is large text and needs 3:1, and it would need 4.5:1 if any breakpoint dropped below 24px. Today the hover measures about 6:1. The bad hover goes red at 1.71.
+
 ## 2026-10-05 — A DRAFT /privacy page and GA4 (G-MSYB9MQGRV) on 29navy.com
 
 The property (556907604) and stream (`G-MSYB9MQGRV`) have existed since 10-01, but the site carried no tag. The central `analytics-tag` recipe refuses a site with no `/privacy`, so the fleet page from reddoor-starter#165 came first, the third such port today after Data Dynamiq and 1836dig. The operator cleared all three to merge ahead of the legal review (reddoor-maintenance Operator decisions 73, extended 10-05).

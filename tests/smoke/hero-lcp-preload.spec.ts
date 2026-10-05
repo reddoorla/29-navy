@@ -301,4 +301,20 @@ test.describe("a phone never downloads the desktop band's photograph (#48)", () 
     );
     expect(initiators).toEqual(["css"]);
   });
+
+  test(
+    "the desktop band paints the authored photograph",
+    { tag: "@smoke" },
+    async ({ page, request }) => {
+      const { url } = bandPhoto(await (await request.get("/")).text());
+      test.skip(!url, "no authored Location photograph");
+
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/");
+
+      const band = page.locator("#Location");
+      await expect(band).toBeVisible();
+      expect(await band.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain(url!);
+    },
+  );
 });

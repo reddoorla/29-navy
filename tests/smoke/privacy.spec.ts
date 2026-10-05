@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("/privacy", () => {
+test.describe("/privacy", { tag: "@smoke" }, () => {
   test("renders the DRAFT policy and asks not to be indexed", async ({ page }) => {
     const response = await page.goto("/privacy", { waitUntil: "domcontentloaded" });
     expect(response?.status()).toBe(200);

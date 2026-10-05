@@ -20,7 +20,7 @@ source. It is the fastest way to recognise what a thing does.
 
 | module | surface | tests | its own first line |
 | --- | --- | --- | --- |
-| [`animateIn.ts`](../src/lib/actions/animateIn.ts) | `animateIn` | 22 |  |
+| [`animateIn.ts`](../src/lib/actions/animateIn.ts) | `animateIn` | 21 |  |
 | [`trapFocus.ts`](../src/lib/actions/trapFocus.ts) | `trapFocus` | 22 | Focus management for modal overlays (WCAG 2.4.3 focus order + 2.1.2 no keyboard trap) |
 | [`Accordion.svelte`](../src/lib/components/Accordion.svelte) | `items`, `allowMultiple` | 4 |  |
 | [`AnimateInTriggered.svelte`](../src/lib/components/Animation/AnimateInTriggered.svelte) | `trigger`, `style`, `transitionDuration`, `children` | — |  |
@@ -75,4 +75,4 @@ source. It is the fastest way to recognise what a thing does.
 | [`richTextHeadings.ts`](../src/lib/utils/richTextHeadings.ts) | `RT_HEADING_CTX`, `defaultLevel`, `buildHeadingLevelMap` | 9 | Editors author arbitrary heading levels inside Prismic rich-text bodies (heading1–6 are all enabled in the slice models) |
 | [`vimeo.ts`](../src/lib/utils/vimeo.ts) | `checkVimeoVideo` | 5 | True when the Vimeo video exists and is embeddable (oEmbed responds 200) |
 
-54 modules, 340 tests behind them.
+54 modules, 339 tests behind them.

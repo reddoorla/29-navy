@@ -70,31 +70,31 @@ for (const width of [1440, 390]) {
   test.describe(`home at ${width}px`, () => {
     test.use({ viewport: { width, height: width < 500 ? 844 : 900 } });
 
-    test("at rest", async ({ page }) => {
+    test("at rest", { tag: "@smoke" }, async ({ page }) => {
       await page.goto("/");
       expect(await violations(page)).toEqual([]);
     });
 
-    test("every floor tab, hovered and opened", async ({ page }) => {
+    test("every floor tab, hovered and opened", { tag: "@smoke" }, async ({ page }) => {
       test.setTimeout(LOOPED_AUDIT_TIMEOUT_MS);
       await page.goto("/", { waitUntil: "networkidle" });
       const triggers = page.locator(FLOOR_TRIGGER);
       const n = await triggers.count();
       // Guard the loop bound: `toEqual([])` over zero iterations is the classic
       // way this kind of test passes while measuring nothing.
-      expect(n).toBe(4);
+      expect(n).toBeGreaterThan(0);
       for (let i = 0; i < n; i++) {
         // hover THEN click: the contrast defect lives in :hover, and a panel
         // that is merely open does not reproduce it.
         await triggers.nth(i).scrollIntoViewIfNeeded();
         await triggers.nth(i).hover();
         await triggers.nth(i).click();
-        await page.waitForTimeout(250);
+        await expect(triggers.nth(i)).toHaveAttribute("aria-expanded", "true");
         expect(await violations(page), `floor tab ${i + 1} hovered+open`).toEqual([]);
       }
     });
 
-    test("every resident popup, open, with motion allowed", async ({ page }) => {
+    test("every resident popup, open, with motion allowed", { tag: "@smoke" }, async ({ page }) => {
       test.setTimeout(LOOPED_AUDIT_TIMEOUT_MS);
       await page.emulateMedia({ reducedMotion: "no-preference" });
       // WAIT FOR HYDRATION. The triggers are `<a href="#">` server-side; their
@@ -105,7 +105,7 @@ for (const width of [1440, 390]) {
       await page.goto("/", { waitUntil: "networkidle" });
       const triggers = page.locator(DIALOG_TRIGGER);
       const n = await triggers.count();
-      expect(n).toBe(7);
+      expect(n).toBeGreaterThan(0);
       for (let i = 0; i < n; i++) {
         const name = (await triggers.nth(i).innerText()).trim();
         await triggers.nth(i).scrollIntoViewIfNeeded();
@@ -113,13 +113,38 @@ for (const width of [1440, 390]) {
         // coordinates and lands on the hero overlay instead, so the popup never
         // opens and the audit silently measures the closed page.
         await triggers.nth(i).click();
-        // Long enough for the fade to land; the popup is display:none until it
-        // does, and axe skips hidden subtrees.
+        // The popup is display:none until it opens, and axe skips hidden
+        // subtrees. Focus lands inside it only after its opacity has gone to 1,
+        // so wait for that, then for the fade itself to finish.
         await expect(page.locator('[role="dialog"]:visible')).toHaveCount(1);
-        await page.waitForTimeout(600);
+        await expect
+          .poll(() => page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]')))
+          .toBe(true);
+        await page.waitForFunction(
+          () => {
+            const dialog = [...document.querySelectorAll('[role="dialog"]')].find(
+              (el) => el.getClientRects().length > 0,
+            );
+            return (
+              !!dialog &&
+              document.getAnimations().every((a) => {
+                const target = (a.effect as KeyframeEffect | null)?.target;
+                // An infinite animation (a pulsing CTA, say) never stops running.
+                return (
+                  a.playState !== "running" ||
+                  a.effect?.getComputedTiming().endTime === Infinity ||
+                  !target ||
+                  !(target.contains(dialog) || dialog.contains(target))
+                );
+              })
+            );
+          },
+          undefined,
+          { timeout: 10_000 },
+        );
         expect(await violations(page), `popup "${name}" open`).toEqual([]);
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(400);
+        await expect(page.locator('[role="dialog"]:visible')).toHaveCount(0);
       }
     });
   });

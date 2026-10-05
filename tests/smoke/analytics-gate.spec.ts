@@ -28,7 +28,7 @@ async function tagState(page: Page) {
   }));
 }
 
-test.describe("the GA4 tag's production-host gate", () => {
+test.describe("the GA4 tag's production-host gate", { tag: "@smoke" }, () => {
   // The page keeps fetching Prismic images and Vimeo after the assertions
   // pass, and a proxied request still in flight at teardown throws "Fetch
   // response has been disposed" out of route.fulfill.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 
 // Facts about the repo that no component test can see: what the shipped
 // document head points at, and whether the suite can run somewhere other than
@@ -10,32 +11,60 @@ const read = (p: string) => readFileSync(resolve(ROOT, p));
 
 describe("app.html", () => {
   const APP_HTML = read("src/app.html").toString("utf8");
-  /** Every `href` on a <link rel="…icon…">, with SvelteKit's asset placeholder
-      stripped back to the path under static/. */
-  const iconHrefs = [...APP_HTML.matchAll(/<link[^>]*\brel="[^"]*icon[^"]*"[^>]*>/g)].map((m) => {
-    const href = m[0].match(/href="([^"]+)"/)?.[1] ?? "";
-    return href.replace("%sveltekit.assets%/", "");
+  /** Every <link rel="…icon…">: its rel tokens, and its `href` (asset placeholder
+      or root-relative, query dropped) as the path under static/. */
+  const icons = [...APP_HTML.matchAll(/<link[^>]*\brel="([^"]*icon[^"]*)"[^>]*>/g)].map((m) => ({
+    rels: m[1].split(/\s+/),
+    href: (m[0].match(/href="([^"]+)"/)?.[1] ?? "")
+      .replace(/^(?:%sveltekit\.assets%)?\//, "")
+      .replace(/[?#].*$/, ""),
+  }));
+  const iconHrefs = icons.map((i) => i.href);
+
+  it("declares a favicon and an apple-touch icon", () => {
+    expect(icons.flatMap((i) => i.rels)).toEqual(
+      expect.arrayContaining(["icon", "apple-touch-icon"]),
+    );
   });
 
-  it("declares both icons", () => {
-    expect(iconHrefs).toEqual(["favicon.png", "apple-touch-icon.png"]);
-  });
-
-  // Positive evidence, not "no 404": each icon is byte-identical to the file
-  // 29navy.com serves for that same rel. The bug this replaces was invisible
-  // precisely because the old favicon.png DID exist and DID return 200 — it was
-  // the template's 128x128 grey placeholder, so the tab looked empty and every
-  // check that only asked "does it resolve" stayed green.
-  const REFERENCE_ICONS: Record<string, string> = {
-    "favicon.png": "29navy/assets/66734453c258a15e340f4029_favicon-32x32.png",
-    "apple-touch-icon.png": "29navy/assets/66f5902c770ab3b836eb01f2_Artboard 1.png",
+  /** Whether a file opens the way an icon format a browser takes does. */
+  const isImage = (bytes: Buffer) => {
+    const hex = bytes.subarray(0, 12).toString("hex");
+    const text = bytes.toString("utf8");
+    return (
+      hex.startsWith("89504e470d0a1a0a") || // PNG
+      hex.startsWith("00000100") || // ICO
+      hex.startsWith("ffd8ff") || // JPEG
+      hex.startsWith("47494638") || // GIF
+      (hex.startsWith("52494646") && hex.slice(16, 24) === "57454250") || // WebP
+      (/^\uFEFF?\s*</.test(text) && /<svg[\s>]/i.test(text)) // SVG
+    );
   };
 
-  for (const [shipped, captured] of Object.entries(REFERENCE_ICONS)) {
-    it(`ships the reference's own ${shipped}`, () => {
-      expect(read(join("static", shipped)).equals(read(join("static", captured)))).toBe(true);
-    });
-  }
+  it("every declared icon is an image file in static/", () => {
+    for (const href of iconHrefs) {
+      expect(isImage(read(join("static", href))), href).toBe(true);
+    }
+  });
+
+  // Not "does it resolve". The bug this replaces was invisible precisely
+  // because the old favicon.png DID exist and DID return 200 — it was the
+  // template's 128x128 grey placeholder, so the tab looked empty and every
+  // check that only asked "does it resolve" stayed green. The test above asks
+  // for an image's own bytes; this one refuses reddoor-starter's
+  // static/favicon.png by digest. Any other image, the client's next favicon
+  // included, passes.
+  const TEMPLATE_PLACEHOLDER_SHA256 =
+    "5146ed79b486cb9e1cdcdd7814cd22ae78e70ceb30fa06b4cd9a16cf121bc9e6";
+
+  it("no declared icon is the template placeholder", () => {
+    for (const href of iconHrefs) {
+      const digest = createHash("sha256")
+        .update(read(join("static", href)))
+        .digest("hex");
+      expect(digest, href).not.toBe(TEMPLATE_PLACEHOLDER_SHA256);
+    }
+  });
 });
 
 describe("the suite runs on a machine that never captured the reference", () => {
@@ -48,10 +77,9 @@ describe("the suite runs on a machine that never captured the reference", () => 
   //
   // The narrow, honest rule: reads of matching/ at MODULE scope (column 0) are
   // banned, because those are the ones that kill collection. Inside a test body
-  // and guarded by existsSync is supported and used — see NavyContact.test.ts
-  // "agrees with the live capture, wherever the live capture exists". This does
-  // not catch a module-scope read spread across several lines; it catches the
-  // shape that actually shipped.
+  // and guarded by existsSync is supported. This does not catch a module-scope
+  // read spread across several lines; it catches the shape that actually
+  // shipped.
   const testFiles: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(resolve(ROOT, dir))) {
