@@ -9,6 +9,10 @@ test.describe("/privacy", { tag: "@smoke" }, () => {
     await expect(page.getByTestId("service-netlify")).toBeVisible();
     await expect(page.getByTestId("service-ga4")).toBeVisible();
     await expect(page.getByTestId("service-forms")).toHaveCount(0);
+    const text = await page.locator("article").innerText();
+    expect(text).toContain('Worthe Real Estate Group ("we") runs this website');
+    expect(text).toContain("Effective October 6, 2026");
+    await expect(page.locator('article a[href="mailto:29navy@worthe.com"]')).toBeVisible();
   });
 
   test("the home page stays indexable and links to it from the contact block", async ({ page }) => {
