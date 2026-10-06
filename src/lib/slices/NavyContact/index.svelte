@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PRIVACY_PATH } from "$lib/privacy/policy";
   import { PrismicText } from "@prismicio/svelte";
   import {
     asLink,
@@ -133,6 +134,13 @@
         >
       </div>
     {/each}
+    <!-- Not in the reference: 29 Navy has no footer, and this block is the
+         page's last, so the privacy policy link lives here
+         (reddoor-maintenance#1055). One text-block-11 line, styled as the
+         contact links; its height cost is in matching/LEDGER.md. -->
+    <div class="text-block-11 privacy">
+      <a href={PRIVACY_PATH} class="contact-link">Privacy Policy</a>
+    </div>
   </div>
   <div>
     {#if isFilled.image(photo)}

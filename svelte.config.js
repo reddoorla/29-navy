@@ -108,11 +108,21 @@ const config = {
           "https://player.vimeo.com",
           // Cloudflare Turnstile contact-form widget (enable via PUBLIC_TURNSTILE_SITE_KEY).
           "https://challenges.cloudflare.com",
+          // GA4, loaded by initAnalytics (src/hooks.client.ts) on 29navy.com
+          // only. These three directives carry reddoor-maintenance's
+          // ANALYTICS_CSP hosts.
+          "https://www.googletagmanager.com",
         ],
         // Google Fonts stylesheet host (paired with fonts.gstatic.com under
         // font-src). Self-hosted fonts need nothing extra.
         "style-src": ["self", "unsafe-inline", "https://fonts.googleapis.com"],
-        "img-src": ["self", "data:", "https://*.prismic.io"],
+        "img-src": [
+          "self",
+          "data:",
+          "https://*.prismic.io",
+          "https://www.googletagmanager.com",
+          "https://*.google-analytics.com",
+        ],
         // Prismic hosts non-image media (e.g. .mp4 assets) on
         // <repo>.cdn.prismic.io — first-party content, same origin family as
         // images.prismic.io already allowed under img-src.
@@ -123,7 +133,13 @@ const config = {
           // Cloudflare Turnstile renders its challenge in an iframe from this host.
           "https://challenges.cloudflare.com",
         ],
-        "connect-src": ["self", "https://*.prismic.io"],
+        "connect-src": [
+          "self",
+          "https://*.prismic.io",
+          "https://www.googletagmanager.com",
+          "https://*.google-analytics.com",
+          "https://*.google.com",
+        ],
         "font-src": ["self", "data:", "https://fonts.gstatic.com"],
         "base-uri": ["self"],
         "form-action": ["self"],

@@ -100,6 +100,21 @@ describe("NavyContact slice", () => {
     expect(Object.keys(model.variations[0].primary)).not.toContain("id");
   });
 
+  it("ends the contact block with a link to the privacy policy, whatever is authored", () => {
+    // 29 Navy has no footer, so this block carries the /privacy link
+    // (reddoor-maintenance#1055); its height cost is in matching/LEDGER.md.
+    const bare = {
+      ...slice,
+      primary: { ...slice.primary, heading: [], photo: {}, links: [] },
+    } as unknown as Slice;
+    for (const s of [slice, bare]) {
+      const anchors = [...mount(s).querySelectorAll("#contact a")];
+      const last = anchors[anchors.length - 1]!;
+      expect(last.getAttribute("href")).toBe("/privacy");
+      expect(last.textContent).toBe("Privacy Policy");
+    }
+  });
+
   it("sets slice data attributes", () => {
     const section = mount().querySelector("[data-slice-type='navy_contact']");
     expect(section?.getAttribute("data-slice-variation")).toBe("default");
