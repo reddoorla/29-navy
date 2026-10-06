@@ -12,7 +12,7 @@ test.describe("/privacy", { tag: "@smoke" }, () => {
     const text = await page.locator("article").innerText();
     expect(text).toContain('Worthe Real Estate Group ("we") runs this website');
     expect(text).toContain("Effective October 6, 2026");
-    await expect(page.locator('article a[href="mailto:29navy@worthe.com"]')).toBeVisible();
+    await expect(page.locator('article a[href="mailto:MatthewB@worthe.com"]')).toBeVisible();
   });
 
   test("the home page stays indexable and links to it from the contact block", async ({ page }) => {
