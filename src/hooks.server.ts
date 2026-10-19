@@ -1,4 +1,4 @@
-import type { Handle } from "@sveltejs/kit";
+import type { Handle } from "@sveltejs/kit/hooks";
 import { isNetlifyHost } from "$lib/indexability";
 import { isCmsFramedRoute, widenFrameAncestors } from "$lib/security/cms-framing";
 

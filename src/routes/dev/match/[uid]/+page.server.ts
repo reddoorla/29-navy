@@ -1,5 +1,5 @@
 import { error } from "@sveltejs/kit";
-import { dev } from "$app/environment";
+import { dev } from "$app/env";
 import { documents } from "$lib/site-pages.js";
 
 // Local matching surface: renders the EXACT assembly `reddoor-maint
@@ -22,14 +22,15 @@ export async function load({ params }) {
   // FIRST statement: everything below reads fixtures that must not be reachable
   // from a production build. The launch recipe asserts this route 404s on the
   // deployed URL, with /dev/a11y-fixtures as the 200 control.
-  if (!dev) error(404, { message: "Not found" });
+  if (!dev) error(404, "Not found");
 
   const docs = documents(devImg) as Array<{ uid: string; data: { slices?: unknown[] } }>;
   const doc = docs.find((d) => d.uid === params.uid);
   if (!doc)
-    error(404, {
-      message: `no assembly for "${params.uid}" (have: ${docs.map((d) => d.uid).join(", ") || "none"})`,
-    });
+    error(
+      404,
+      `no assembly for "${params.uid}" (have: ${docs.map((d) => d.uid).join(", ") || "none"})`,
+    );
 
   return { uid: params.uid, slices: doc.data.slices ?? [] };
 }
