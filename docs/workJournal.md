@@ -3092,3 +3092,13 @@ The operator asked for the legal business name, privacy contact email and effect
 ## 2026-10-06 — The privacy contact is the report recipient
 
 The operator ruled that the policy's contact email is whoever receives this site's maintenance report. The stored row resolves that the same way the report sender does (`report_recipients_to`, falling back to `point_of_contact`, `src/reports/send/orchestrate.ts:216` in reddoor-maintenance), and for this site it gives `MatthewB@worthe.com`. That replaces the value or placeholder from this morning's entry. The privacy test now asserts the `mailto:` link. It fails against the previous config and passes against this one.
+
+## 2026-10-19 — SvelteKit 3 and adapter-netlify 7, on `staging`
+
+Renovate's pair, #79 (adapter-netlify 7) and #80 (kit 3), was red: kit 3 refuses `svelte.config.js`, and adapter 7 peers kit `^3`, so neither can land alone. This is reddoor-maintenance P1-53. Per its Operator decisions 113, the migration lands on a new `staging` branch cut from `main`, and only the operator promotes it.
+
+**This site is starter-shaped, so reddoor-starter#187 applied almost file for file.** It went in as a three-way apply of #187's diff, followed by #188, the kit 3 fix for ending a Prismic preview. The parts it could not apply were all comments, except two code lines. `hooks.server.ts` keeps its own `isNetlifyHost` import and takes `Handle` from `@sveltejs/kit/hooks`. `vite.config.ts` keeps its extensionless script imports. The starter has no `/dev/match` route, and that route needed two more kit 3 edits: `$app/environment` → `$app/env` (svelte-check could not resolve the old module) and `error(404, message)` in place of the deprecated body form. `hooks.client.ts`'s `ClientInit` also moved to `@sveltejs/kit/hooks`.
+
+**`sveltekit.config.js` was written from this site's own config, not copied from the starter.** The starter's file carries the event-replay hash and a per-repository `frame-src`, which this site's CSP does not have. Taking it would have changed the CSP inside a framework migration. So the `kit` keys were lifted one level, `prerender.origin` was dropped for the starter's `productionOrigin` → `define` → `siteOrigin`, and `$lib` was added to `alias`. `handleMissingId` and the GA4 hosts carry over. The copied `kit-config.test.ts` asserted the starter's CSP; here it asserts this site's hosts.
+
+**Measured:** with `URL=https://29navy.com`, the build's `index.html` carries `canonical` `https://29navy.com/`, and no `.html`, `.xml` or `.txt` contains the `sveltekit-prerender` placeholder. Each of these turns the gate red: restoring `svelte.config.js` (vitest stops at startup with `config_file_unsupported`), a `$app/stores` import, and `paths.origin` set.

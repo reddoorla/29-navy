@@ -2,8 +2,8 @@ import { isNetlifyHost } from "$lib/indexability";
 import type { RequestHandler } from "./$types";
 
 // Rendered per request, NOT prerendered, and that is the whole mechanism. A
-// prerendered robots.txt bakes ONE origin (kit.prerender.origin, from Netlify's
-// URL env) into one file at build time, and Netlify then serves those same
+// prerendered robots.txt bakes ONE origin (Netlify's URL at build
+// time) into one file at build time, and Netlify then serves those same
 // bytes on every host the build is reachable from. This file has to say
 // different things on different hosts — see $lib/indexability — so it cannot be
 // a build-time artifact. A robots.txt is one request per crawler visit; the
