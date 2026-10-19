@@ -41,6 +41,7 @@ source. It is the fastest way to recognise what a thing does.
 | [`Modal.svelte`](../src/lib/components/Modal.svelte) | `open`, `onclose`, `children` | 4 |  |
 | [`Nav.svelte`](../src/lib/components/Nav.svelte) | `navLinks`, `items`, `logo` | 14 | Optional per-route override of the `$lib/site-config.json` nav (no route in the bare template supplies this) |
 | [`PreNavTransition.svelte`](../src/lib/components/PreNavTransition.svelte) | `duration`, `holdDuration` | 10 | ms the overlay fades in before the deferred navigation is issued |
+| [`PrismicPreview.svelte`](../src/lib/components/PrismicPreview.svelte) | — | — |  |
 | [`RichTextBody.svelte`](../src/lib/components/RichTextBody.svelte) | `field` | 4 |  |
 | [`RichTextHeading.svelte`](../src/lib/components/RichTextHeading.svelte) | `node`, `children` | — |  |
 | [`ScaleTextToContainer.svelte`](../src/lib/components/ScaleTextToContainer.svelte) | `children` | — |  |
@@ -59,7 +60,7 @@ source. It is the fastest way to recognise what a thing does.
 | [`policy.ts`](../src/lib/privacy/policy.ts) | `PRIVACY_POLICY_DRAFT`, `PRIVACY_PATH`, `formatEffectiveDate` | 2 |  |
 | [`services.ts`](../src/lib/privacy/services.ts) | `SERVICE_HOSTS`, `maskComments`, `startsAnalytics`, `CSP_FALLBACK`, `cspAdmits`, `deriveBuildServices`, `withRuntime` | 26 |  |
 | [`cms-framing.ts`](../src/lib/security/cms-framing.ts) | `CMS_FRAMED_ROUTES`, `CMS_FRAME_ANCESTORS`, `isCmsFramedRoute`, `widenFrameAncestors` | — | Routes the CMS loads in an iframe from another origin |
-| [`seo.ts`](../src/lib/seo.ts) | `SITE_NAME`, `SITE_LOCALE`, `DEFAULT_DESCRIPTION`, `DEFAULT_OG_IMAGE`, `OG_IMAGE_WIDTH`, `OG_IMAGE_HEIGHT`, `composeTitle`, `jsonLdScript`, `canonicalUrl`, `resolveOgImage`, `organizationJsonLd` | 21 | Site-wide SEO configuration + helpers |
+| [`seo.ts`](../src/lib/seo.ts) | `SITE_NAME`, `SITE_LOCALE`, `DEFAULT_DESCRIPTION`, `DEFAULT_OG_IMAGE`, `OG_IMAGE_WIDTH`, `OG_IMAGE_HEIGHT`, `composeTitle`, `jsonLdScript`, `PRERENDER_PLACEHOLDER_ORIGIN`, `siteOrigin`, `canonicalUrl`, `resolveOgImage`, `organizationJsonLd` | 24 | Site-wide SEO configuration + helpers |
 | [`site-config.ts`](../src/lib/site-config.ts) | `loadSiteConfig`, `footerColumns` | 4 | Site chrome (navigation + footer) from a checked-in JSON stub |
 | [`site-pages.js`](../src/lib/site-pages.js) | `lang`, `documents` | 3 | The page assemblies for this site — the SINGLE source of truth for both consumers: src/routes/dev/match/[uid], the local matching surface, and the seed that publishes them through Prismic's Migration API |
 | [`viewport.svelte.ts`](../src/lib/stores/viewport.svelte.ts) | `viewport` | — |  |
@@ -75,4 +76,4 @@ source. It is the fastest way to recognise what a thing does.
 | [`richTextHeadings.ts`](../src/lib/utils/richTextHeadings.ts) | `RT_HEADING_CTX`, `defaultLevel`, `buildHeadingLevelMap` | 9 | Editors author arbitrary heading levels inside Prismic rich-text bodies (heading1–6 are all enabled in the slice models) |
 | [`vimeo.ts`](../src/lib/utils/vimeo.ts) | `checkVimeoVideo` | 5 | True when the Vimeo video exists and is embeddable (oEmbed responds 200) |
 
-54 modules, 339 tests behind them.
+55 modules, 342 tests behind them.
