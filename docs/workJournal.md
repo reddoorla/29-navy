@@ -3103,7 +3103,7 @@ Renovate's pair, #79 (adapter-netlify 7) and #80 (kit 3), was red: kit 3 refuses
 
 **Measured:** with `URL=https://29navy.com`, the build's `index.html` carries `canonical` `https://29navy.com/`, and no `.html`, `.xml` or `.txt` contains the `sveltekit-prerender` placeholder. Each of these turns the gate red: restoring `svelte.config.js` (vitest stops at startup with `config_file_unsupported`), a `$app/stores` import, and `paths.origin` set.
 
-## 2026-10-27 — Inherit the starters' test-pin fixes (#101)
+## 2026-10-27 — Inherit the starters' test-pin fixes (#TBD)
 
 Batch C of the fleet test audit (`reddoorla/reddoor-workspace` `audits/2026-10-26-fleet-test-audit/report.md`) fixed design-value and exact-count pins in the starters, and this site carries the starters' copies of those tests, so the same fixes are ported here. The hunks applied cleanly; the intent is the starters' own, with no design value, no source read as text and no exact list.
 
