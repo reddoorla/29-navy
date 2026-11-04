@@ -18,7 +18,7 @@ importers:
         specifier: ^1.17.0
         version: 1.67.0(svelte@5.57.3(@typescript-eslint/types@8.72.1))
       '@prismicio/client':
-        specifier: ^7.21.8
+        specifier: ^7.23.0
         version: 7.23.0
       '@prismicio/svelte':
         specifier: ^3.2.0
