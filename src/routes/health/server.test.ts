@@ -90,7 +90,7 @@ describe("/health GET", () => {
     expect(mocks.getRepository).not.toHaveBeenCalled();
   });
 
-  it("maps forms env presence to booleans and declares NO testMode forwarding", async () => {
+  it("maps forms env presence to booleans, declares NO testMode forwarding, and declares no form", async () => {
     mocks.getRepository.mockResolvedValue({});
     mocks.privateEnv.FORMS_INGEST_URL = "https://ingest.example/submit";
     // FORMS_INGEST_TOKEN intentionally left unset.
