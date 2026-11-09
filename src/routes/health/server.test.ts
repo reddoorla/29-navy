@@ -41,6 +41,7 @@ type HealthBody = {
     ingestToken: boolean;
     turnstile: boolean;
     testMode: boolean;
+    none: boolean;
   };
 };
 
@@ -103,6 +104,8 @@ describe("/health GET", () => {
       // /contact route was deleted in #32), so nothing forwards the marker.
       // The fleet form-e2e probe submits only where this is strictly `true`.
       testMode: false,
+      // The site ships no form, which the probe checks before it records n/a.
+      none: true,
     });
   });
 

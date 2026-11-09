@@ -47,6 +47,11 @@ export const GET: RequestHandler = async ({ fetch }) => {
     // flip it to true without a form action that actually forwards the marker,
     // or the probe's submission lands as a real lead.
     testMode: false,
+    // Declares that this site ships no form at all, so the nightly form-e2e
+    // records it n/a instead of listing it UNCOVERED. The probe checks the
+    // claim: it opens /contact and / without submitting, and a form found there
+    // puts the site back on UNCOVERED. Remove this in the PR that adds a form.
+    none: true,
   };
   // The downstream function-health audit treats an unreachable endpoint as "not
   // present"; since we are inside the handler, the function ran, so ok is false

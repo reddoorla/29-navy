@@ -3140,3 +3140,9 @@ The proof: vitest runs 72 files and 597 tests with the same per-file counts as `
 Review round 1 (one Opus reviewer, three lenses, all six sites at once) found no blocker. Its two nits are folded in: the triggered reduced-motion check now reads `style.cssText` too (a delayed transition written under reduced motion stayed green on the shorthand read), and ContentWidth's token is set in `beforeEach` and cleared in `afterEach`.
 
 Review round 2 (Opus, three lenses, the six PRs at once) found minors and nits only, so the review closes clean; the nits in this PR's own files are folded in.
+
+## 2026-11-09 — /health declares the site has no form, so the nightly form test stops listing it uncovered (`forms.none`)
+
+29 Navy has printed on maintenance's `FLEET_FORM_E2E_UNCOVERED` line every night since at least 10-26. That line is supposed to mean "has a form the nightly should test and did not". This site has no form: #32 deleted the starter's /contact, `routes.test.ts` pins that, and the live HTML on 11-09 has no `<form>` on `/` (where the only contact is two `mailto:` links) while `/contact` answers 404. `/health` already said `testMode: false` on purpose, and the probe refuses on that flag before it ever looks for a form, so the n/a verdict a formless site earns was unreachable here. The Williamson sites reach it only because they declare `testMode: true`, which this file's comment rightly forbids without a forwarding form.
+
+`forms.none: true` is the new declaration, read by reddoorla/reddoor-maintenance's form-e2e (the PR that adds it). The probe does not trust it: it opens `/contact` and `/` without filling or submitting, and records n/a only when neither carries a contact form. A form added later without removing this line puts the site straight back on UNCOVERED, which is the right failure. `testMode` stays `false`.
