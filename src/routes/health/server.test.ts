@@ -41,6 +41,7 @@ type HealthBody = {
     ingestToken: boolean;
     turnstile: boolean;
     testMode: boolean;
+    none: boolean;
   };
 };
 
@@ -89,7 +90,7 @@ describe("/health GET", () => {
     expect(mocks.getRepository).not.toHaveBeenCalled();
   });
 
-  it("maps forms env presence to booleans and declares NO testMode forwarding", async () => {
+  it("maps forms env presence to booleans, declares NO testMode forwarding, and declares no form", async () => {
     mocks.getRepository.mockResolvedValue({});
     mocks.privateEnv.FORMS_INGEST_URL = "https://ingest.example/submit";
     // FORMS_INGEST_TOKEN intentionally left unset.
@@ -103,6 +104,8 @@ describe("/health GET", () => {
       // /contact route was deleted in #32), so nothing forwards the marker.
       // The fleet form-e2e probe submits only where this is strictly `true`.
       testMode: false,
+      // The site ships no form, which the probe checks before it records n/a.
+      none: true,
     });
   });
 
