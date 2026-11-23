@@ -130,8 +130,10 @@
           href={asLink(link.target) ?? undefined}
           target={linkTarget(link)}
           rel={linkTarget(link) === "_blank" ? "noopener noreferrer" : undefined}
-          class="contact-link">{link.label}<br />{link.value}<br />{ZWJ}</a
+          class="contact-link"
         >
+          {link.label}<br />{link.value}<br />{ZWJ}
+        </a>
       </div>
     {/each}
     <!-- Not in the reference: 29 Navy has no footer, and this block is the
